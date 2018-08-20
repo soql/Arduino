@@ -1,12 +1,13 @@
 #include "DHT.h"
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
+#include <Servo.h>
 
-/*#define WIFI_AP "ZJC-N"
-#define WIFI_PASSWORD "820813130882"*/
+#define WIFI_AP "ZJC-N"
+#define WIFI_PASSWORD "820813130882"
 
-#define WIFI_AP "SoqlAP"
-#define WIFI_PASSWORD "EQDLPNNM"
+/*#define WIFI_AP "SoqlAP"
+#define WIFI_PASSWORD "EQDLPNNM"*/
 
 /*#define WIFI_AP "DWR-116_5E63AE"
 #define WIFI_PASSWORD "1438775157"*/
@@ -16,14 +17,22 @@
 #define IN_TOPIC "/telemetry/oven/set"
 #define OUT_TOPIC "/telemetry/oven/get"
 
-/*IPAddress mqttServerIP(192,168,1,168);*/
-IPAddress mqttServerIP(91,239,168,107);
+#define SERVO_PORT 0
+
+/*DHT22*/
+#define DHTPIN 2
+#define DHTTYPE DHT22
+DHT dht(DHTPIN, DHTTYPE);
+
+IPAddress mqttServerIP(192,168,1,168);
+/*IPAddress mqttServerIP(91,239,168,107);*/
 
 void callback(char* topic, byte* payload, unsigned int length);
 
 /*MQTT**/
 WiFiClient wifiClient;
 PubSubClient client(wifiClient);
+Servo termostat;
 
 int i=0;
 
@@ -43,15 +52,21 @@ void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Cos odebrano");
   Serial.println(topic);
   if(strcmp(topic, IN_TOPIC)==0){    
-    byte* p = (byte*)malloc(length);  
-    memcpy(p,payload,length);
+    String p;
+    for(int j=0; j<length; j++){
+      p+=(char)payload[j];
+    }
     Serial.print("Odebrano ");
-    Serial.println((char*)p);
-    free(p);
+    Serial.print(length);
+    Serial.println("b");
+    Serial.println(p);    
+    Serial.println(p.toInt());  
+    termostat.write(p.toInt()); 
   }
 }
  
 void loop() {
+  termostat.attach(SERVO_PORT);
   ConnectToAP(); 
   client.loop();
   i++;
@@ -69,7 +84,7 @@ void loop() {
 
 void ConnectToAP()
 {
-  int i=0;
+  int c=0;
   if(WiFi.status() == WL_CONNECTED)
     return;
   Serial.print("Connecting to AP ...");
@@ -78,8 +93,8 @@ void ConnectToAP()
   while (WiFi.status() != WL_CONNECTED) {
     delay(200);
     Serial.print(".");
-    i++;
-    if(i>=40){
+    c++;
+    if(c>=40){
       ESP.reset();
     }
   }
@@ -91,7 +106,7 @@ void ConnectToAP()
 
 void sendToMQTT(String dataToSend){
  ConnectToAP();
-  int i=0;
+  int d=0;
   
   while ( !client.connected() ) {
     client.setServer( mqttServerIP, 1883);  
@@ -101,13 +116,13 @@ void sendToMQTT(String dataToSend){
       Serial.println( "[DONE]" );
       client.subscribe(IN_TOPIC);
     } else {
-      i++;
+      d++;
       Serial.print( "[FAILED] [ rc = " );
       Serial.print( client.state() );
       Serial.println( " : retrying in 5 seconds]" );
       // Wait 5 seconds before retrying
       delay( 1000 );
-      if(i>=10){
+      if(d>=10){
         Serial.println("[ERROR] Cannot connect to MQTT Server");
         ESP.reset();
       }
@@ -121,10 +136,7 @@ void sendToMQTT(String dataToSend){
   delay(500);
 }
 
-/*DHT22*/
-#define DHTPIN 2
-#define DHTTYPE DHT22
-DHT dht(DHTPIN, DHTTYPE);
+
 
 struct dhtresults_struct getResultsFromDHT22(){
   int i=0;
@@ -153,4 +165,5 @@ struct dhtresults_struct getResultsFromDHT22(){
   ESP.reset();  
   return dhtresults;
 }
+
 

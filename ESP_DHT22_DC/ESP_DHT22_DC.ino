@@ -2,13 +2,21 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 
-#define WIFI_AP "ZJC-N"
-#define WIFI_PASSWORD "820813130882"
+struct wifi_struct {
+    String ssid;
+    String password;
+};
+
+wifi_struct wifi[2]={
+  {"ZJC-W","820813130882"},
+  {"ZJC-N","820813130882"}
+};
+
 
 /*#define WIFI_AP "DWR-116_5E63AE"
 #define WIFI_PASSWORD "1438775157"*/
 
-#define TOKEN "ESP8266_DHT_TEST"
+#define TOKEN "ESP8266_DHT22_DC_WEED"
 
 IPAddress mqttServerIP(192,168,1,168);  
 /*IPAddress mqttServerIP(79,190,140,82);*/   
@@ -34,8 +42,8 @@ void setup() {
 }
 
 void goDeepSleep(){
- Serial.println("Go into deepsleep mode.");
- /*ESP.deepSleep(1000000*30);*/
+ /*Serial.println("Go into deepsleep mode.");
+ ESP.deepSleep(1000000*30);*/
  delay(30000);
  ESP.reset();
 }
@@ -47,21 +55,26 @@ void loop() {
 
 void ConnectToAP()
 {
-  int i=0;
-  if(WiFi.status() == WL_CONNECTED)
-    return;
-  Serial.print("Connecting to AP ...");
-  // attempt to connect to WiFi network
-  WiFi.begin(WIFI_AP, WIFI_PASSWORD);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(200);
-    Serial.print(".");
-    i++;
-    if(i>=40){
-      goDeepSleep();
+  for(int i=0; i<sizeof(wifi); i++){
+    int retry=0;
+    if(WiFi.status() == WL_CONNECTED)
+      return;
+    Serial.print("Connecting to AP ...");
+    // attempt to connect to WiFi network
+    
+    WiFi.begin(wifi[i].ssid.c_str(), wifi[i].password.c_str());
+    while (WiFi.status() != WL_CONNECTED) {
+      delay(200);
+      Serial.print(".");
+      retry++;
+      if(retry>=40){
+        break;;
+      }
     }
+    Serial.println("Connected to AP");
+    return;
   }
-  Serial.println("Connected to AP");
+  goDeepSleep();
 }
 
 
@@ -76,7 +89,7 @@ void sendToMQTT(String dataToSend){
   client.setServer( mqttServerIP, 1883 );  
   Serial.print("Connecting to ThingsBoard node ...");
   while ( !client.connected() ) {
-    if ( client.connect("ESP8266 Device", TOKEN, NULL) ) {
+    if ( client.connect(TOKEN) ) {
       Serial.println( "[DONE]" );
     } else {
       i++;
@@ -93,14 +106,14 @@ void sendToMQTT(String dataToSend){
   }
   char attributes[100];
   dataToSend.toCharArray( attributes, 100 );
-  client.publish( "telemetry/test/dht22", attributes );
+  client.publish( "telemetry/flower/inside", attributes );
   Serial.print( "Send to MQTT:" );
   Serial.println( attributes );   
   delay(500);
 }
 
 /*DHT22*/
-#define DHTPIN D2
+#define DHTPIN 0
 #define DHTTYPE DHT22
 DHT dht(DHTPIN, DHTTYPE);
 

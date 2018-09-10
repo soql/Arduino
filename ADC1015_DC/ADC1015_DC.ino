@@ -9,7 +9,7 @@
 /*#define WIFI_AP "DWR-116_5E63AE"
 #define WIFI_PASSWORD "1438775157"*/
 
-#define TOKEN "ESP8266_DHT_ADC_1"
+#define TOKEN "ESP8266_DHT_ADC_WEED"
 
 IPAddress mqttServerIP(192,168,1,168);  
 /*IPAddress mqttServerIP(79,190,140,82);*/
@@ -109,7 +109,7 @@ void sendToMQTT(String dataToSend){
   client.setServer( mqttServerIP, 1883 );  
   Serial.print("Connecting to ThingsBoard node ...");
   while ( !client.connected() ) {
-    if ( client.connect("ESP8266 Device", TOKEN, NULL) ) {
+    if ( client.connect(TOKEN) ) {
       Serial.println( "[DONE]" );
     } else {
       i++;

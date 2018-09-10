@@ -42,6 +42,7 @@ struct dhtresults_struct {
 };
 
 void setup() {
+ termostat.attach(SERVO_PORT);
  Serial.begin(115200);
  delay(10);  
  
@@ -66,7 +67,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 }
  
 void loop() {
-  termostat.attach(SERVO_PORT);
+  
   ConnectToAP(); 
   client.loop();
   i++;
@@ -143,10 +144,10 @@ struct dhtresults_struct getResultsFromDHT22(){
   float t,h;
   struct dhtresults_struct dhtresults;
   while(i<10){
-    h=2;
-    t=2;
-      /*h = dht.readHumidity();
-      t = dht.readTemperature();*/
+    /*h=2;
+    t=2;*/
+      h = dht.readHumidity();
+      t = dht.readTemperature();
       if (isnan(h) || isnan(t)) {
         i++;
         Serial.println("Failed to read from DHT sensor!");      

@@ -1,7 +1,8 @@
-#include "DHT.h"
+#include "dht_nonblocking.h"
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include <Servo.h>
+
 
 #define WIFI_AP "ZJC-N"
 #define WIFI_PASSWORD "820813130882"
@@ -20,9 +21,11 @@
 #define SERVO_PORT 0
 
 /*DHT22*/
-#define DHTPIN 2
-#define DHTTYPE DHT22
-DHT dht(DHTPIN, DHTTYPE);
+static const int DHT_SENSOR_PIN = 2;
+
+#define DHT_SENSOR_TYPE DHT_TYPE_22
+
+DHT_nonblocking dht_sensor( DHT_SENSOR_PIN, DHT_SENSOR_TYPE );
 
 IPAddress mqttServerIP(192,168,1,168);
 /*IPAddress mqttServerIP(91,239,168,107);*/
@@ -33,13 +36,6 @@ void callback(char* topic, byte* payload, unsigned int length);
 WiFiClient wifiClient;
 PubSubClient client(wifiClient);
 Servo termostat;
-
-int i=0;
-
-struct dhtresults_struct {
-    float temperature;
-    float humidity;    
-};
 
 void setup() {
  termostat.attach(SERVO_PORT);
@@ -66,21 +62,26 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
 }
  
-void loop() {
-  
+void loop() {  
   ConnectToAP(); 
   client.loop();
-  i++;
-  if(i>300000){
-    i=0;
-    struct dhtresults_struct dht22=getResultsFromDHT22(); 
-    String payload = "{";
-    payload += "\"temperature\":"; payload += dht22.temperature; payload += ",";
-    payload += "\"humidity\":"; payload += dht22.humidity; payload += ",";
+  float temperature;
+  float humidity;  
+  if( measure_environment( &temperature, &humidity ) == true )
+  {
+    Serial.print( "T = " );
+    Serial.print( temperature, 1 );
+    Serial.print( " deg. C, H = " );
+    Serial.print( humidity, 1 );
+    Serial.println( "%" );
+     String payload = "{";
+    payload += "\"temperature\":"; payload += temperature; payload += ",";
+    payload += "\"humidity\":"; payload += humidity; payload += ",";
     payload += "\"rssi\":"; payload += WiFi.RSSI();
     payload += "}";
     sendToMQTT(payload); 
-  }
+    
+  } 
 }
 
 void ConnectToAP()
@@ -113,7 +114,7 @@ void sendToMQTT(String dataToSend){
     client.setServer( mqttServerIP, 1883);  
     client.setCallback(callback);
     Serial.print("Connecting to MQTT Server ...");
-    if ( client.connect("ESP8266 Device", TOKEN, NULL) ) {
+    if ( client.connect(TOKEN) ) {
       Serial.println( "[DONE]" );
       client.subscribe(IN_TOPIC);
     } else {
@@ -136,35 +137,22 @@ void sendToMQTT(String dataToSend){
   Serial.println( attributes );   
   delay(500);
 }
+long measurement_timestamp = 0;
 
+static bool measure_environment( float *temperature, float *humidity )
+{
+  
 
-
-struct dhtresults_struct getResultsFromDHT22(){
-  int i=0;
-  float t,h;
-  struct dhtresults_struct dhtresults;
-  while(i<10){
-    /*h=2;
-    t=2;*/
-      h = dht.readHumidity();
-      t = dht.readTemperature();
-      if (isnan(h) || isnan(t)) {
-        i++;
-        Serial.println("Failed to read from DHT sensor!");      
-        delay(500);
-      }else{
-        dhtresults.temperature=t;
-        dhtresults.humidity=h;
-        Serial.print("DHT22 Results. Humidity: ");      
-        Serial.print(h);      
-        Serial.print(". Temperature: ");              
-        Serial.print(t);      
-        Serial.println(" *C ");      
-        return dhtresults;
-      }
+  /* Measure once every four seconds. */
+  if( millis( ) - measurement_timestamp > 4000ul )
+  {
+    if( dht_sensor.measure( temperature, humidity ) == true )
+    {
+      measurement_timestamp = millis( );
+      return( true );
+    }
   }
-  ESP.reset();  
-  return dhtresults;
-}
 
+  return( false );
+}
 

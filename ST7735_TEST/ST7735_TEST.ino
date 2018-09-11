@@ -4,9 +4,8 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
-
-#define WIFI_AP "SoqlNet"
-#define WIFI_PASSWORD "820813130882"
+#include <WString.h>
+#include "soql_tools.h"
 
 #define TOKEN "ESP8266_OVEN_DISPLAY_2"
 
@@ -17,34 +16,19 @@ IPAddress mqttServerIP(91,239,168,107);
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 
+wifi_struct wifi[2]={  
+  {"ZJC-N","820813130882"},
+  {"SoqlNet","820813130882"}
+};
 
 
 void callback(char* topic, byte* payload, unsigned int length) ;
 
 double temperature;
 double humidity;
-
-void ConnectToAP()
-{
-  int c=0;
-  if(WiFi.status() == WL_CONNECTED)
-    return;
-  Serial.print("Connecting to AP ...");
-  // attempt to connect to WiFi network
-  WiFi.begin(WIFI_AP, WIFI_PASSWORD);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(200);
-    Serial.print(".");
-    c++;
-    if(c>=40){
-      ESP.reset();
-    }
-  }
-  Serial.println("Connected to AP");
-}
-
+double setOnPiec=5.5;
   
-
+long lastChange=0;
 
 void connectToMQTT(){
    int d=0;
@@ -72,13 +56,9 @@ void connectToMQTT(){
 
 TFT_eSPI tft = TFT_eSPI();  // Invoke library, pins defined in User_Setup.h
 
-long lastChange=0;
-long actTime=0;
-
-
 void setup(void) {
   Serial.begin(115200);
-  while (!Serial) continue;
+  while (!Serial) continue;  
   Serial.println(MQTT_MAX_PACKET_SIZE);
   tft.init();
   tft.setRotation(3);
@@ -86,59 +66,126 @@ void setup(void) {
   mqttClient.setServer( mqttServerIP, 1883);  
   mqttClient.setCallback(callback);
   lastChange=millis();
-    
+  pinMode(D1, INPUT);
+  pinMode(D2, INPUT);  
 }
-double prevTemp;
-double prevHumidity;
+
+void showTemperature(){
+    String temp=String(temperature, 1);       
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextColor(TFT_YELLOW, TFT_BLACK);              
+    tft.setTextDatum(4);
+    tft.drawString(temp,80,64,7);
+}
+
+void showHumidity(){
+   String humi=String(humidity, 1);        
+   tft.fillScreen(TFT_BLACK);
+   tft.setTextColor(TFT_BLUE, TFT_BLACK);      
+   tft.drawString(humi,80,64,7);
+}
+
+void showTermostat(){
+   String tempOnPiec=String(setOnPiec, 1);     
+   tft.setTextColor(TFT_RED, TFT_BLACK);      
+   tft.drawString(tempOnPiec,80,110,4);  
+}
+
+void showAllTermostat(){
+   String tempOnPiec=String(setOnPiec, 1);       
+   tft.fillScreen(TFT_BLACK);
+   tft.setTextColor(TFT_RED, TFT_BLACK);              
+   tft.setTextDatum(4);
+   tft.drawString(tempOnPiec,80,64,7);
+}
+
 int whatToShow=0;
-double setOnPiec=5.5;
+int prevStateD1;
+int prevStateD2;
+long activeD1Time=0;
+long inactiveD1Time=0;
+
 boolean change=true;
 void loop() {      
-    ConnectToAP(); 
+    ConnectToAP(wifi, 2); 
     connectToMQTT();
-    mqttClient.loop();    
-    char* temp="4125";
-         if(change){
+    mqttClient.loop();        
+    if(change){
       if(whatToShow==0){             
-        String temp=String(temperature, 1);       
-        tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_YELLOW, TFT_BLACK);              
-        tft.setTextDatum(4);
-        tft.drawString(temp,80,64,7);
-        String tempOnPiec=String(setOnPiec, 1);     
-        tft.setTextColor(TFT_RED, TFT_BLACK);      
-        tft.drawString(tempOnPiec,80,110,4);  
+        showTemperature();
+        showTermostat();
       }
       if(whatToShow==1){                         
-        String humi=String(humidity, 1);
-        humi=humi+"%";
-        tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_BLUE, TFT_BLACK);      
-        tft.drawString(humi,80,64,7);    
+       showHumidity();  
+       showTermostat();  
       } 
-         }     
-      actTime=millis()-lastChange;  
-      Serial.println(actTime);      
+     if(whatToShow==2){                              
+       showAllTermostat();  
+      } 
       change=false;
-          if(whatToShow==0){
-            if(actTime>5000){          
-              whatToShow=1;
-              lastChange=millis();                   
-          change=true;                                  
-            }
-          }
-          actTime=millis()-lastChange;  
-          if(whatToShow==1){
-            if(actTime>1500){          
-              whatToShow=0;
-              lastChange=millis();                 
-              change=true;                                  
-            }
-          }
-          
-      prevHumidity=humidity;
-      prevTemp=temperature;
+    }         
+
+     int actStateD1=digitalRead(D1);   
+     int actStateD2=digitalRead(D2);   
+    
+     if((actStateD1==1 && prevStateD1==0) || (actStateD2==1 && prevStateD2==0)){      
+        inactiveD1Time=0;
+        activeD1Time=millis();      
+     }     
+     if(actStateD1==0 && prevStateD1==1 || (actStateD2==0 && prevStateD2==1)){      
+        activeD1Time=0;
+        inactiveD1Time=millis();
+     }  
+     prevStateD1=actStateD1;
+     prevStateD2=actStateD2;
      
+     if((actStateD1==1 || actStateD2==1) && millis()-activeD1Time>200 && whatToShow!=2){
+            whatToShow=2;
+            inactiveD1Time=0;
+            activeD1Time=millis();  
+            change=true;              
+            return;         
+     }
+     if((actStateD1==1 || actStateD2) && millis()-activeD1Time>200 && whatToShow==2){
+        if(actStateD1==1){
+            setOnPiec=setOnPiec+0.5;
+        }
+        if(actStateD2==1){
+            setOnPiec=setOnPiec-0.5;
+        }
+            activeD1Time=millis();
+            change=true;   
+            return;         
+     }
+     if(actStateD1==0 && actStateD2==0 && millis()-inactiveD1Time>2000 && whatToShow==2){
+        whatToShow=0;
+        inactiveD1Time=0;
+        activeD1Time=0;
+        change=true;
+        return;
+     }
+    if(activeD1Time!=0 || inactiveD1Time!=0){      
+      return;
+    }
+    long actTime=millis()-lastChange;                           
+    
+    if(whatToShow==0){
+      if(actTime>5000){          
+        whatToShow=1;
+        lastChange=millis();                   
+        change=true;        
+        return;                          
+      }
+    }       
+   
+    if(whatToShow==1){
+      if(actTime>1500){          
+        whatToShow=0;
+        lastChange=millis();                 
+        change=true;                                  
+        return;
+      }
+    }
      
 }
 

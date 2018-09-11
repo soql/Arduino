@@ -1,11 +1,7 @@
 #include "DHT.h"
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
-
-struct wifi_struct {
-    String ssid;
-    String password;
-};
+#include <soql_tools.h>
 
 wifi_struct wifi[2]={
   {"ZJC-W","820813130882"},
@@ -30,7 +26,7 @@ void setup() {
  Serial.begin(115200);
  delay(10); 
  struct dhtresults_struct dht22=getResultsFromDHT22(); 
- ConnectToAP(); 
+ ConnectToAP(wifi, 2);
  
  String payload = "{";
   payload += "\"temperature\":"; payload += dht22.temperature; payload += ",";
@@ -53,38 +49,13 @@ void loop() {
 
 }
 
-void ConnectToAP()
-{
-  for(int i=0; i<sizeof(wifi); i++){
-    int retry=0;
-    if(WiFi.status() == WL_CONNECTED)
-      return;
-    Serial.print("Connecting to AP ...");
-    // attempt to connect to WiFi network
-    
-    WiFi.begin(wifi[i].ssid.c_str(), wifi[i].password.c_str());
-    while (WiFi.status() != WL_CONNECTED) {
-      delay(200);
-      Serial.print(".");
-      retry++;
-      if(retry>=40){
-        break;;
-      }
-    }
-    Serial.println("Connected to AP");
-    return;
-  }
-  goDeepSleep();
-}
-
-
 /*MQTT**/
 WiFiClient wifiClient;
 PubSubClient client(wifiClient);
 
 
 void sendToMQTT(String dataToSend){
- ConnectToAP();
+ ConnectToAP(wifi, 2);
   int i=0;
   client.setServer( mqttServerIP, 1883 );  
   Serial.print("Connecting to ThingsBoard node ...");

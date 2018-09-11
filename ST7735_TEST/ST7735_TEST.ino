@@ -5,7 +5,7 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <WString.h>
-#include "soql_tools.h"
+#include <soql_tools.h>
 
 #define TOKEN "ESP8266_OVEN_DISPLAY_2"
 
@@ -75,14 +75,14 @@ void showTemperature(){
     tft.fillScreen(TFT_BLACK);
     tft.setTextColor(TFT_YELLOW, TFT_BLACK);              
     tft.setTextDatum(4);
-    tft.drawString(temp,80,64,7);
+    tft.drawString(temp,80,54,7);
 }
 
 void showHumidity(){
    String humi=String(humidity, 1);        
    tft.fillScreen(TFT_BLACK);
    tft.setTextColor(TFT_BLUE, TFT_BLACK);      
-   tft.drawString(humi,80,64,7);
+   tft.drawString(humi,80,54,7);
 }
 
 void showTermostat(){
@@ -96,7 +96,7 @@ void showAllTermostat(){
    tft.fillScreen(TFT_BLACK);
    tft.setTextColor(TFT_RED, TFT_BLACK);              
    tft.setTextDatum(4);
-   tft.drawString(tempOnPiec,80,64,7);
+   tft.drawString(tempOnPiec,80,54,7);
 }
 
 int whatToShow=0;

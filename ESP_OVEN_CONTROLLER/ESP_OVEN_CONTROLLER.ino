@@ -2,16 +2,13 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include <Servo.h>
+#include <soql_tools.h>
 
+wifi_struct wifi[2]={
+  {"ZJC-N","820813130882"},
+  {"ZJC-W","820813130882"}
+};
 
-#define WIFI_AP "ZJC-N"
-#define WIFI_PASSWORD "820813130882"
-
-/*#define WIFI_AP "SoqlAP"
-#define WIFI_PASSWORD "EQDLPNNM"*/
-
-/*#define WIFI_AP "DWR-116_5E63AE"
-#define WIFI_PASSWORD "1438775157"*/
 
 #define TOKEN "ESP8266_OVEN_CONTROLLER"
 
@@ -63,7 +60,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 }
  
 void loop() {  
-  ConnectToAP(); 
+  ConnectToAP(wifi, 2);
   client.loop();
   float temperature;
   float humidity;  
@@ -84,30 +81,9 @@ void loop() {
   } 
 }
 
-void ConnectToAP()
-{
-  int c=0;
-  if(WiFi.status() == WL_CONNECTED)
-    return;
-  Serial.print("Connecting to AP ...");
-  // attempt to connect to WiFi network
-  WiFi.begin(WIFI_AP, WIFI_PASSWORD);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(200);
-    Serial.print(".");
-    c++;
-    if(c>=40){
-      ESP.reset();
-    }
-  }
-  Serial.println("Connected to AP");
-}
-
-
-
 
 void sendToMQTT(String dataToSend){
- ConnectToAP();
+ConnectToAP(wifi, 2);
   int d=0;
   
   while ( !client.connected() ) {

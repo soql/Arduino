@@ -11,7 +11,7 @@
 
 IPAddress mqttServerIP(91,239,168,107);
 
-#define IN_TOPIC "telemetry/flower/inside"
+#define IN_TOPIC "/telemetry/oven/get"
 
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);

@@ -3,9 +3,10 @@
 #include <PubSubClient.h>
 #include <soql_tools.h>
 
-wifi_struct wifi[2]={
+wifi_struct wifi[3]={
   {"ZJC-W","820813130882"},
-  {"ZJC-N","820813130882"}
+  {"ZJC-N","820813130882"},
+  {"ZJCCRYPTO","820813130882"}
 };
 
 
@@ -25,13 +26,13 @@ struct dhtresults_struct {
 void setup() {
  Serial.begin(115200);
  delay(10); 
- struct dhtresults_struct dht22=getResultsFromDHT22(); 
- ConnectToAP(wifi, 2);
+ ConnectToAP(wifi, 3);
+ struct dhtresults_struct dht22=getResultsFromDHT22();  
  
  String payload = "{";
   payload += "\"temperature\":"; payload += dht22.temperature; payload += ",";
-  payload += "\"humidity\":"; payload += dht22.humidity;/* payload += ",";*/
-  /*payload += "\"rssi\":"; payload += WiFi.rssi();*/
+  payload += "\"humidity\":"; payload += dht22.humidity; payload += ",";
+  payload += "\"rssi\":"; payload += WiFi.RSSI();
   payload += "}";
  sendToMQTT(payload);
  goDeepSleep();
@@ -55,7 +56,7 @@ PubSubClient client(wifiClient);
 
 
 void sendToMQTT(String dataToSend){
- ConnectToAP(wifi, 2);
+ ConnectToAP(wifi, 3);
   int i=0;
   client.setServer( mqttServerIP, 1883 );  
   Serial.print("Connecting to ThingsBoard node ...");

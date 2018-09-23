@@ -9,9 +9,10 @@
 
 #define TOKEN "ESP8266_OVEN_DISPLAY_2"
 
-IPAddress mqttServerIP(91,239,168,107);
+IPAddress mqttServerIP(192,168,1,168);
 
 #define IN_TOPIC "/telemetry/oven/get"
+#define OUT_TOPIC "/telemetry/oven/set"
 
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
@@ -139,14 +140,14 @@ void loop() {
      prevStateD1=actStateD1;
      prevStateD2=actStateD2;
      
-     if((actStateD1==1 || actStateD2==1) && millis()-activeD1Time>200 && whatToShow!=2){
+     if((actStateD1==1 || actStateD2==1) && millis()-activeD1Time>150 && whatToShow!=2){
             whatToShow=2;
             inactiveD1Time=0;
             activeD1Time=millis();  
             change=true;              
             return;         
      }
-     if((actStateD1==1 || actStateD2) && millis()-activeD1Time>200 && whatToShow==2){
+     if((actStateD1==1 || actStateD2) && millis()-activeD1Time>150 && whatToShow==2){
         if(actStateD1==1){
             setOnPiec=setOnPiec+0.5;
         }
@@ -162,6 +163,8 @@ void loop() {
         inactiveD1Time=0;
         activeD1Time=0;
         change=true;
+        char TempString[10];
+        sendToMQTT(String(setOnPiec*4,0));
         return;
      }
     if(activeD1Time!=0 || inactiveD1Time!=0){      
@@ -187,6 +190,17 @@ void loop() {
       }
     }
      
+}
+
+void sendToMQTT(String dataToSend){
+  int d=0;
+  
+  char attributes[100];
+  dataToSend.toCharArray( attributes, 100 );
+  mqttClient.publish(OUT_TOPIC, attributes );
+  Serial.print( "Send to MQTT:" );
+  Serial.println( attributes );   
+  delay(50);
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {

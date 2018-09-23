@@ -29,6 +29,10 @@ IPAddress mqttServerIP(192,168,1,168);
 
 void callback(char* topic, byte* payload, unsigned int length);
 
+float temperature;
+float humidity;  
+int termostatValue=6;
+
 /*MQTT**/
 WiFiClient wifiClient;
 PubSubClient client(wifiClient);
@@ -36,8 +40,9 @@ Servo termostat;
 
 void setup() {
  termostat.attach(SERVO_PORT);
- Serial.begin(115200);
+ Serial.begin(115200); 
  delay(10);  
+ termostat.write(map(termostatValue, 6, 24, 0, 165));    
  
  
 }
@@ -50,20 +55,16 @@ void callback(char* topic, byte* payload, unsigned int length) {
     for(int j=0; j<length; j++){
       p+=(char)payload[j];
     }
-    Serial.print("Odebrano ");
-    Serial.print(length);
-    Serial.println("b");
-    Serial.println(p);    
-    Serial.println(p.toInt());  
-    termostat.write(p.toInt()); 
+    termostatValue=p.toInt();  
+    termostat.write(map(termostatValue, 6, 24, 0, 165));    
+    generateAndSend();
   }
 }
  
 void loop() {  
   ConnectToAP(wifi, 2);
   client.loop();
-  float temperature;
-  float humidity;  
+  
   if( measure_environment( &temperature, &humidity ) == true )
   {
     Serial.print( "T = " );
@@ -71,17 +72,20 @@ void loop() {
     Serial.print( " deg. C, H = " );
     Serial.print( humidity, 1 );
     Serial.println( "%" );
-     String payload = "{";
-    payload += "\"temperature\":"; payload += temperature; payload += ",";
-    payload += "\"humidity\":"; payload += humidity; payload += ",";
-    payload += "\"rssi\":"; payload += WiFi.RSSI();
-    payload += "}";
-    sendToMQTT(payload); 
+    generateAndSend();
     
   } 
 }
 
-
+void generateAndSend(){
+  String payload = "{";
+    payload += "\"temperature\":"; payload += temperature; payload += ",";
+    payload += "\"humidity\":"; payload += humidity; payload += ",";
+    payload += "\"termostatValue\":"; payload += termostatValue; payload += ",";
+    payload += "\"rssi\":"; payload += WiFi.RSSI();
+    payload += "}";
+    sendToMQTT(payload); 
+}
 void sendToMQTT(String dataToSend){
 ConnectToAP(wifi, 2);
   int d=0;
@@ -120,7 +124,7 @@ static bool measure_environment( float *temperature, float *humidity )
   
 
   /* Measure once every four seconds. */
-  if( millis( ) - measurement_timestamp > 4000ul )
+  if( millis( ) - measurement_timestamp > 15000ul )
   {
     if( dht_sensor.measure( temperature, humidity ) == true )
     {

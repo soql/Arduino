@@ -1,6 +1,7 @@
 #ifndef _SOQL_TOOLS_H
 #define _SOQL_TOOLS_H
 #include <WString.h>
+#include <PubSubClient.h>
 
 struct wifi_struct {
     String ssid;
@@ -8,6 +9,11 @@ struct wifi_struct {
 };
 
 int ConnectToAP(wifi_struct wifilist[], int wifisize);
+void connectToMQTT(PubSubClient* client, IPAddress mqttServerIP, char* token, void (*callback)(char*, uint8_t*, uint32_t), void (*onConnect)(PubSubClient*));
+String getMAC();
+String generateTechInfo(int version, char* info);
+void checkForUpdates(int version);
+void sendToMqtt(PubSubClient* client, char* topic, String dataToSend);
 
 #endif /*_SOQL_TOOLS_H */
 

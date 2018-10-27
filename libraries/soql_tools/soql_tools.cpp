@@ -2,8 +2,19 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
+#include <WiFiUdp.h>
 
 const char* fwUrlBase = "http://esp.oth.net.pl:8099/";
+
+void goDeepSleep(int timeInSeconds, boolean deep){
+	if(deep){
+		 Serial.println("Go into deepsleep mode.");
+		 ESP.deepSleep(1000000*timeInSeconds);
+	}else{
+	 delay(1000*timeInSeconds);
+	 ESP.reset();
+	}
+}
 
 int ConnectToAP(wifi_struct wifilist[], int wifisize)
 {
@@ -52,9 +63,13 @@ void connectToMQTT(PubSubClient* client, IPAddress mqttServerIP, char* token, vo
    while ( !client->connected() ) {
     Serial.print(".");
     client->setServer( mqttServerIP, 1883);
-    client->setCallback(callback);
+    if(callback!=NULL){
+	    client->setCallback(callback);
+    }
      if ( client->connect(token) ) {
-       onConnect(client);
+	     if(onConnect!=NULL){
+		       onConnect(client);
+	     }
        Serial.println( "[DONE]" );
      }else{
        delay( 100 );
@@ -142,10 +157,16 @@ void checkForUpdates(int version) {
 }
 
 void sendToMqtt(PubSubClient* client, char* topic, String dataToSend){
-  char attributes[100];
-  dataToSend.toCharArray( attributes, 100 );
+  char attributes[256];
+  dataToSend.toCharArray( attributes, 256 );
   client->publish( topic, attributes );
   Serial.print( "Send to MQTT:" );
   Serial.println( attributes );
   delay(100);
+}
+void initSerial(int baudrate){
+	Serial.begin(baudrate);
+	while(!Serial){
+		continue;
+	}
 }

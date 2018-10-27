@@ -1,76 +1,98 @@
 #include <PubSubClient.h>
 #include <ESP8266WiFi.h>
+#include <soql_tools.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
+
+#define FW_VERSION 4
+#define FW_INFO "Kontroller poziomu peletu"
+
+#define WIFI_COUNT 3
+
+wifi_struct wifi[WIFI_COUNT] = {   
+  {"TP-LINK_A3D1EC"  , "1438775157"},
+  {"DWR-116_5E63AE" , "1438775157"},
+  {"ZJC-N"          , "820813130882"},
+};
 
 
-#define WIFI_AP "ZJC-N"
-#define WIFI_PASSWORD "820813130882"
+#define TOKEN "WEMOS_D1_LITE_OVEN_MEAS"
 
-#define TOKEN "ESP8266_TOKEN_2"
-
-#define echoPin 2 // Echo Pin
-#define trigPin 0 // Trigger Pin
+#define echoPin D1 // Echo Pin
+#define trigPin D2 // Trigger Pin
 
 
 long duration, distance; // Duration used to calculate distance
 
-int status = WL_IDLE_STATUS;
-
 WiFiClient wifiClient;
 PubSubClient client(wifiClient);
 
-char mqttServer[] = "oth.net.pl";
+IPAddress mqttServerIP(192,168,2,3);
+
+/*NtpClient*/
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "192.168.2.3", 0, 60000);
+
+void goDeepSleep(int timeInSeconds){
+  ESP.deepSleep(timeInSeconds*1000000);
+}
+
+void isort(int *a, int n)
+{
+ for (int i = 1; i < n; ++i)
+ {
+   int j = a[i];
+   int k;
+   for (k = i - 1; (k >= 0) && (j < a[k]); k--)
+   {
+     a[k + 1] = a[k];
+   }
+   a[k + 1] = j;
+ }
+}
+
 void setup() {
-   Serial.begin(115200); 
+    initSerial(115200);
+    ConnectToAP(wifi, WIFI_COUNT);  
+    checkForUpdates(FW_VERSION);
+    connectToMQTT(&client, mqttServerIP, TOKEN, NULL, NULL);  
+    sendToMqtt(&client,"/telemetry/technical/info", generateTechInfo(FW_VERSION, FW_INFO));
+  
    pinMode(trigPin, OUTPUT);
    pinMode(echoPin, INPUT);
-   client.setServer( mqttServer, 1883 );      
+    timeClient.begin();
 }
 
 void loop() {
-   if ( !client.connected() ) {
-    reconnect();
-  }  
-  Serial.println("Połączone!!");
-  sendMqttData(getDistance());
-  delay(5000);
-}
+    ConnectToAP(wifi, WIFI_COUNT);
+    connectToMQTT(&client, mqttServerIP, TOKEN, NULL, NULL);  
+    timeClient.update();
 
-void sendMqttData(int distanceToSend){
-  String payload = "{";
-  payload += "\"distance\":"; payload+=distanceToSend;
-  payload += "}";
+    int results[20];
 
-  // Send payload
-  char attributes[100];
-  payload.toCharArray( attributes, 100 );
-  client.publish( "telemetry/dhsr04/koltownia", attributes );
-  Serial.println( attributes );
-}
-
-void reconnect() {
-  // Loop until we're reconnected
-  while (!client.connected()) {
-    status = WiFi.status();
-    if ( status != WL_CONNECTED) {
-      WiFi.begin(WIFI_AP, WIFI_PASSWORD);
-      while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial.print(".");
-      }
-      Serial.println("Connected to AP");
+    
+    
+    for(int i=0; i<20; i++){
+      results[i]=getDistance();
+      delay(1000);
     }
-    Serial.print("Connecting to ThingsBoard node ...");
-    // Attempt to connect (clientId, username, password)
-    if ( client.connect("ESP8266 Device", TOKEN, NULL) ) {
-      Serial.println( "[DONE]" );
-    } else {
-      Serial.print( "[FAILED] [ rc = " );
-      Serial.print( client.state() );
-      Serial.println( " : retrying in 5 seconds]" );
-      // Wait 5 seconds before retrying
-      delay( 5000 );
+    isort(results, 20);
+
+    int sum=0;
+    for(int i=5; i<15; i++){
+      sum+=results[i];
     }
-  }
+
+    
+  
+    String payload = "{";
+    payload += "\"distance\":"; payload += sum/10; payload += ",";    
+    payload += "\"time\":"; payload += timeClient.getFormattedTime(); payload += ",";
+    payload += "\"rssi\":"; payload += WiFi.RSSI();
+    payload += "}";
+    sendToMqtt(&client,"/telemetry/boiler/oven", payload);   
+    delay(1000);
+    goDeepSleep(60); 
 }
 
 long getDistance(){

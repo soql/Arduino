@@ -27,7 +27,7 @@ void callback(char* topic, byte* payload, unsigned int length) ;
 
 double temperature;
 double humidity;
-double setOnPiec=5.5;
+double setOnPiec;
   
 long lastChange=0;
 
@@ -149,10 +149,10 @@ void loop() {
      }
      if((actStateD1==1 || actStateD2) && millis()-activeD1Time>150 && whatToShow==2){
         if(actStateD1==1){
-            setOnPiec=setOnPiec+0.5;
+            setOnPiec=setOnPiec+1;
         }
         if(actStateD2==1){
-            setOnPiec=setOnPiec-0.5;
+            setOnPiec=setOnPiec-1;
         }
             activeD1Time=millis();
             change=true;   
@@ -164,7 +164,7 @@ void loop() {
         activeD1Time=0;
         change=true;
         char TempString[10];
-        sendToMQTT(String(setOnPiec*4,0));
+        sendToMQTT(String(setOnPiec));
         return;
      }
     if(activeD1Time!=0 || inactiveD1Time!=0){      
@@ -224,7 +224,9 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
     JsonObject root = jsonBuffer.as<JsonObject>();
     temperature = root["temperature"];    
-    humidity= root["humidity"];    
+    humidity= root["humidity"]; 
+    setOnPiec= root["termostatValue"];
+    change=true;
     Serial.println("SENSOR");    
     Serial.println(temperature);    
   }  

@@ -4,6 +4,9 @@
 #include <Servo.h>
 #include <soql_tools.h>
 
+#define FW_VERSION 7
+#define FW_INFO "Kontroller pieca zjc"
+
 wifi_struct wifi[2]={
   {"ZJC-N","820813130882"},
   {"ZJC-W","820813130882"}
@@ -15,10 +18,11 @@ wifi_struct wifi[2]={
 #define IN_TOPIC "/telemetry/oven/set"
 #define OUT_TOPIC "/telemetry/oven/get"
 
-#define SERVO_PORT 0
+#define SERVO_PORT D3
 
+#define WIFI_COUNT 2
 /*DHT22*/
-static const int DHT_SENSOR_PIN = 2;
+static const int DHT_SENSOR_PIN = D4;
 
 #define DHT_SENSOR_TYPE DHT_TYPE_22
 
@@ -31,7 +35,7 @@ void callback(char* topic, byte* payload, unsigned int length);
 
 float temperature;
 float humidity;  
-int termostatValue=6;
+int termostatValue=8;
 
 /*MQTT**/
 WiFiClient wifiClient;
@@ -39,12 +43,25 @@ PubSubClient client(wifiClient);
 Servo termostat;
 
 void setup() {
- termostat.attach(SERVO_PORT);
  Serial.begin(115200); 
- delay(10);  
- termostat.write(map(termostatValue, 6, 24, 0, 165));    
+ delay(1000);  
+ 
+ ConnectToAP(wifi, WIFI_COUNT);
+ connectToMQTT(&client, mqttServerIP, TOKEN, callback, onConnect);
+ sendToMqtt(&client,"/telemetry/technical/info", generateTechInfo(FW_VERSION, FW_INFO));
+ checkForUpdates(FW_VERSION);
+ pinMode(SERVO_PORT, OUTPUT);
+ delay(1000); 
+ termostat.attach(SERVO_PORT);
+ delay(1000); 
+ int toWrite=map(termostatValue, 6, 24, 0, 165);
+ termostat.write(toWrite);    
  
  
+}
+
+void onConnect(PubSubClient* client) {
+    client->subscribe(IN_TOPIC);
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
@@ -54,17 +71,21 @@ void callback(char* topic, byte* payload, unsigned int length) {
     String p;
     for(int j=0; j<length; j++){
       p+=(char)payload[j];
+    }    
+    if(termostatValue!=p.toInt()){
+      termostatValue=p.toInt();      
+      termostat.attach(SERVO_PORT);
+      int toWrite=map(termostatValue, 6, 24, 0, 165);
+      termostat.write(toWrite);    
+      generateAndSend();
     }
-    termostatValue=p.toInt();  
-    termostat.write(map(termostatValue, 6, 24, 0, 165));    
-    generateAndSend();
   }
 }
  
 void loop() {  
   ConnectToAP(wifi, 2);
+  connectToMQTT(&client, mqttServerIP, TOKEN, callback, onConnect);
   client.loop();
-  
   if( measure_environment( &temperature, &humidity ) == true )
   {
     Serial.print( "T = " );
@@ -82,48 +103,18 @@ void generateAndSend(){
     payload += "\"temperature\":"; payload += temperature; payload += ",";
     payload += "\"humidity\":"; payload += humidity; payload += ",";
     payload += "\"termostatValue\":"; payload += termostatValue; payload += ",";
+    payload += "\"ap\":\""; payload += WiFi.SSID();payload += "\",";
     payload += "\"rssi\":"; payload += WiFi.RSSI();
     payload += "}";
-    sendToMQTT(payload); 
+    sendToMqtt(&client,OUT_TOPIC,payload); 
 }
-void sendToMQTT(String dataToSend){
-ConnectToAP(wifi, 2);
-  int d=0;
-  
-  while ( !client.connected() ) {
-    client.setServer( mqttServerIP, 1883);  
-    client.setCallback(callback);
-    Serial.print("Connecting to MQTT Server ...");
-    if ( client.connect(TOKEN) ) {
-      Serial.println( "[DONE]" );
-      client.subscribe(IN_TOPIC);
-    } else {
-      d++;
-      Serial.print( "[FAILED] [ rc = " );
-      Serial.print( client.state() );
-      Serial.println( " : retrying in 5 seconds]" );
-      // Wait 5 seconds before retrying
-      delay( 1000 );
-      if(d>=10){
-        Serial.println("[ERROR] Cannot connect to MQTT Server");
-        ESP.reset();
-      }
-    }
-  }
-  char attributes[100];
-  dataToSend.toCharArray( attributes, 100 );
-  client.publish(OUT_TOPIC, attributes );
-  Serial.print( "Send to MQTT:" );
-  Serial.println( attributes );   
-  delay(500);
-}
+
 long measurement_timestamp = 0;
 
 static bool measure_environment( float *temperature, float *humidity )
 {
   
-
-  /* Measure once every four seconds. */
+  
   if( millis( ) - measurement_timestamp > 15000ul )
   {
     if( dht_sensor.measure( temperature, humidity ) == true )
@@ -135,4 +126,3 @@ static bool measure_environment( float *temperature, float *humidity )
 
   return( false );
 }
-

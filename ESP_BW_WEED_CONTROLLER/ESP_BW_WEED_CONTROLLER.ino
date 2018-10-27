@@ -2,14 +2,16 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include <soql_tools.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
 
-#define FW_VERSION 3
+
+#define FW_VERSION 6
 #define FW_INFO "Kontroller weed na BG"
 
-#define WIFI_COUNT 3
+#define WIFI_COUNT 2
 
-wifi_struct wifi[WIFI_COUNT] = {
-  {"SoqlAP", "EQDLPNNM"},
+wifi_struct wifi[WIFI_COUNT] = { 
   {"SoqlNet", "820813130882"},
   {"SoqlNet-CN", "820813130882"}
 };
@@ -22,13 +24,17 @@ void callback(char* topic, byte* p, unsigned int length);
 #define TOKEN "ESP8266_BW_WEED_CONTROLLER"
 
 /*DHT22*/
-DHT_nonblocking dht_sensor( D8 , DHT_TYPE_22 );
+DHT_nonblocking* dht_sensor;
 float temperature;
 float humidity;
 
 WiFiClient wifiClient;
 PubSubClient client(wifiClient);
-IPAddress mqttServerIP(79, 190, 140, 82);
+IPAddress mqttServerIP(192,168,2,2);
+
+/*NtpClient*/
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "192.168.2.2", 0, 60000);
 
 void onConnect(PubSubClient* client);
 
@@ -43,14 +49,13 @@ void onConnect(PubSubClient* client) {
   client->subscribe("/telemetry/weedbg/switch4/get");
 }
 void setup() {
-  Serial.begin(115200);
-  while (!Serial) {
-    continue;
-  }
-  ConnectToAP(wifi, WIFI_COUNT);
-  connectToMQTT(&client, mqttServerIP, TOKEN, callback, onConnect);
-  sendToMqtt(&client,"/telemetry/technical/info", generateTechInfo(FW_VERSION, FW_INFO));
+  initSerial(115200);
+  ConnectToAP(wifi, WIFI_COUNT);  
   checkForUpdates(FW_VERSION);
+  connectToMQTT(&client, mqttServerIP, TOKEN, callback, onConnect);  
+  sendToMqtt(&client,"/telemetry/technical/info", generateTechInfo(FW_VERSION, FW_INFO));
+
+  dht_sensor=new DHT_nonblocking( D6 , DHT_TYPE_22 );
 
   pinMode(D1, OUTPUT);
   pinMode(D2, OUTPUT);
@@ -60,11 +65,14 @@ void setup() {
   digitalWrite(D2, HIGH);
   digitalWrite(D3, HIGH);
   digitalWrite(D4, HIGH);
+
+  timeClient.begin();
 }
 void loop() {
   ConnectToAP(wifi, WIFI_COUNT);
   connectToMQTT(&client, mqttServerIP, TOKEN, callback, onConnect);
   client.loop();
+  timeClient.update();
 
   if ( measure_environment( &temperature, &humidity ) == true )
   {
@@ -76,10 +84,12 @@ void loop() {
     String payload = "{";
     payload += "\"temperature\":"; payload += temperature; payload += ",";
     payload += "\"humidity\":"; payload += humidity; payload += ",";
+    payload += "\"time\":"; payload += timeClient.getFormattedTime(); payload += ",";
     payload += "\"rssi\":"; payload += WiFi.RSSI();
     payload += "}";
     sendToMqtt(&client,"/telemetry/weedbg/dht22", payload);
-
+ 
+  
   }
 }
 
@@ -154,7 +164,7 @@ static bool measure_environment( float *temperature, float *humidity )
   /* Measure once every four seconds. */
   if ( millis( ) - measurement_timestamp > 15000ul )
   {
-    if ( dht_sensor.measure( temperature, humidity ) == true )
+    if ( dht_sensor->measure( temperature, humidity ) == true )
     {
       measurement_timestamp = millis( );
       return ( true );

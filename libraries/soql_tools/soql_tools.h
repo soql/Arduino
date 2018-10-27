@@ -14,6 +14,9 @@ String getMAC();
 String generateTechInfo(int version, char* info);
 void checkForUpdates(int version);
 void sendToMqtt(PubSubClient* client, char* topic, String dataToSend);
+void initSerial(int baudrate);
+uint32_t getTimeFromNTP(IPAddress timeServerIP);
+void goDeepSleep(int timeInSeconds, boolean deep);
 
 #endif /*_SOQL_TOOLS_H */
 

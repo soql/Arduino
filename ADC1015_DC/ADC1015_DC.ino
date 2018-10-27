@@ -2,17 +2,28 @@
 #include <PubSubClient.h>
 #include <Wire.h>
 #include <Adafruit_ADS1015.h>
+#include <soql_tools.h>
 
-#define WIFI_AP "ZJC-W"
-#define WIFI_PASSWORD "820813130882"
+#define FW_VERSION 2
+#define FW_INFO "Kontroller wilgotności gleby"
 
-/*#define WIFI_AP "DWR-116_5E63AE"
-#define WIFI_PASSWORD "1438775157"*/
+
+#define WIFI_COUNT 3
+
+wifi_struct wifi[WIFI_COUNT] = { 
+  {"ZJC-W", "820813130882"},
+  {"ZJC-N", "820813130882"},
+  {"ZJCCRYPTO", "820813130882"},
+};
+
+/*MQTT**/
+WiFiClient wifiClient;
+PubSubClient client(wifiClient);
 
 #define TOKEN "ESP8266_DHT_ADC_WEED"
 
 IPAddress mqttServerIP(192,168,1,168);  
-/*IPAddress mqttServerIP(79,190,140,82);*/
+
 
 struct ads_result {
     int adc0;
@@ -22,24 +33,30 @@ struct ads_result {
 };
 
 void setup() {
- Serial.begin(115200);
+initSerial(115200);
+  ConnectToAP(wifi, WIFI_COUNT);  
+  checkForUpdates(FW_VERSION);
+  connectToMQTT(&client, mqttServerIP, TOKEN, NULL, NULL);  
+  sendToMqtt(&client,"/telemetry/technical/info", generateTechInfo(FW_VERSION, FW_INFO));
+  
   Wire.pins(0, 2);
   Wire.begin(0, 2);
   byte error, address;
   int nDevices;
   nDevices = 0;
- delay(10);  
- struct ads_result ads=readADS();
- ConnectToAP(); 
+  delay(10);  
+  struct ads_result ads=readADS(); 
  
  String payload = "{";
   payload += "\"adc0\":"; payload +=ads.adc0; payload += ",";
   payload += "\"adc1\":"; payload +=ads.adc1; payload += ",";
   payload += "\"adc2\":"; payload +=ads.adc2; payload += ",";
-  payload += "\"adc3\":"; payload +=ads.adc3;
+  payload += "\"adc3\":"; payload +=ads.adc3; payload += ",";
+  payload += "\"rssi\":"; payload += WiFi.RSSI(); payload += ",";
+  payload += "\"ssid\":\""; payload += WiFi.SSID(); payload += "\"";
   payload += "}";
- sendToMQTT(payload);
- goDeepSleep();
+ sendToMqtt(&client,"telemetry/flower/soil",payload);
+ goDeepSleep(false, 30);
 }
 
 
@@ -66,70 +83,12 @@ struct ads_result readADS(){
    Serial.println(" ");
    return adsresults;
 }
-void goDeepSleep(){
-  delay(30000);
-  ESP.reset();
- /*Serial.println("Go into deepsleep mode.");
- ESP.deepSleep(1000000*3);*/
-}
- 
+
 void loop() {
   // put your main code here, to run repeatedly:
 
 }
 
-void ConnectToAP()
-{
-  int i=0;
-  if(WiFi.status() == WL_CONNECTED)
-    return;
-  Serial.print("Connecting to AP ...");
-  // attempt to connect to WiFi network
-  WiFi.begin(WIFI_AP, WIFI_PASSWORD);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(200);
-    Serial.print(".");
-    i++;
-    if(i>=40){
-      goDeepSleep();
-    }
-  }
-  Serial.println("Connected to AP");
-}
 
-
-/*MQTT**/
-WiFiClient wifiClient;
-PubSubClient client(wifiClient);
-
-
-void sendToMQTT(String dataToSend){
- ConnectToAP();
-  int i=0;
-  client.setServer( mqttServerIP, 1883 );  
-  Serial.print("Connecting to ThingsBoard node ...");
-  while ( !client.connected() ) {
-    if ( client.connect(TOKEN) ) {
-      Serial.println( "[DONE]" );
-    } else {
-      i++;
-      Serial.print( "[FAILED] [ rc = " );
-      Serial.print( client.state() );
-      Serial.println( " : retrying in 5 seconds]" );
-      // Wait 5 seconds before retrying
-      delay( 1000 );
-      if(i>=10){
-        Serial.println("[ERROR] Cannot connect to MQTT Server");
-        goDeepSleep();
-      }
-    }
-  }
-  char attributes[100];
-  dataToSend.toCharArray( attributes, 100 );
-  client.publish( "telemetry/flower/soil", attributes );
-  Serial.print( "Send to MQTT:" );
-  Serial.println( attributes );   
-  delay(500);
-}
 
 

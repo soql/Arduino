@@ -3,8 +3,18 @@
 #include <soql_tools.h>
 #include <NTPClient.h>
 #include <WiFiUdp.h>
+#include "DHT.h"
 
-#define FW_VERSION 4
+struct dhtresults_struct {
+    float temperature;
+    float humidity;    
+};
+
+/*DHT22*/
+#define DHTPIN D6
+#define DHTTYPE DHT22
+
+#define FW_VERSION 7
 #define FW_INFO "Kontroller poziomu peletu"
 
 #define WIFI_COUNT 3
@@ -61,6 +71,34 @@ void setup() {
    pinMode(trigPin, OUTPUT);
    pinMode(echoPin, INPUT);
     timeClient.begin();
+    timeClient.update();
+    struct dhtresults_struct dht22=getResultsFromDHT22();  
+     int results[20];
+
+    
+    
+    for(int i=0; i<20; i++){
+      results[i]=getDistance();
+      delay(1000);
+    }
+    isort(results, 20);
+
+    int sum=0;
+    for(int i=5; i<15; i++){
+      sum+=results[i];
+    }
+
+      
+    String payload = "{";
+    payload += "\"temperature\":"; payload += dht22.temperature; payload += ",";
+    payload += "\"humidity\":"; payload += dht22.humidity; payload += ",";  
+    payload += "\"distance\":"; payload += sum/10; payload += ",";    
+    payload += "\"time\":"; payload += timeClient.getEpochTime(); payload += ",";
+    payload += "\"rssi\":"; payload += WiFi.RSSI();
+    payload += "}";
+    sendToMqtt(&client,"/telemetry/boiler/oven", payload);   
+    delay(1000);
+    goDeepSleep(30);
 }
 
 void loop() {
@@ -110,5 +148,36 @@ long getDistance(){
   return distance;
   
 }
+
+DHT dht(DHTPIN, DHTTYPE);
+
+struct dhtresults_struct getResultsFromDHT22(){
+  int i=0;
+  float t,h;
+  struct dhtresults_struct dhtresults;
+  while(i<10){
+    /*h=2;
+    t=2;*/
+      h = dht.readHumidity();
+      t = dht.readTemperature();
+      if (isnan(h) || isnan(t)) {
+        i++;
+        Serial.println("Failed to read from DHT sensor!");      
+        delay(500);
+      }else{
+        dhtresults.temperature=t;
+        dhtresults.humidity=h;
+        Serial.print("DHT22 Results. Humidity: ");      
+        Serial.print(h);      
+        Serial.print(". Temperature: ");              
+        Serial.print(t);      
+        Serial.println(" *C ");      
+        return dhtresults;
+      }
+  }
+ goDeepSleep(30,true);
+  return dhtresults;
+}
+
 
 

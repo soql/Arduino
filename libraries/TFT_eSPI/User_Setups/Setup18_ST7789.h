@@ -25,12 +25,17 @@
 //#define ILI9488_DRIVER
 #define ST7789_DRIVER
 
+// Some displays support SPI reads via the MISO pin, if the display has a single
+// bi-directional SDA pin the library will try to use bit banging to read the line
+// To use the SDA line for reading data from the TFT uncomment the following line:
+//#define TFT_SDA_READ
+
 // For M5Stack ESP32 module with integrated display ONLY, remove // in line below
 //#define M5STACK
 
 // For ST7735  and ILI9163 ONLY, define the pixel width and height in portrait orientation
-//#define TFT_WIDTH  128
-//#define TFT_HEIGHT 160
+#define TFT_WIDTH  240
+#define TFT_HEIGHT 240
 //#define TFT_HEIGHT 128
 
 // For ST7735 ONLY, define the type of display, originally this was based on the
@@ -47,6 +52,7 @@
 //#define ST7735_GREENTAB128 // For 128 x 128 display
 //#define ST7735_REDTAB
 //#define ST7735_BLACKTAB
+
 
 // ##################################################################################
 //
@@ -236,7 +242,7 @@
 // #define SPI_FREQUENCY  80000000
 
 // The XPT2046 requires a lower SPI clock rate of 2.5MHz so we define that here:
-#define SPI_TOUCH_FREQUENCY  2500000
+//#define SPI_TOUCH_FREQUENCY  2500000
 
 
 // Comment out the following #define if "SPI Transactions" do not need to be

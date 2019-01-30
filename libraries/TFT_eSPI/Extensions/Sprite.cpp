@@ -67,7 +67,13 @@ void* TFT_eSprite::createSprite(int16_t w, int16_t h, uint8_t frames)
   // hence will run faster in normal circumstances.
   if (_bpp == 16)
   {
+
+#if defined (ESP32) && defined (CONFIG_SPIRAM_SUPPORT)
+    if ( psramFound() ) _img8_1 = ( uint8_t*) ps_calloc(w * h + 1, sizeof(uint16_t));
+    else
+#endif
     _img8_1 = ( uint8_t*) calloc(w * h + 1, sizeof(uint16_t));
+
     _img8_2 = _img8_1;
     _img    = (uint16_t*) _img8_1;
 
@@ -80,6 +86,10 @@ void* TFT_eSprite::createSprite(int16_t w, int16_t h, uint8_t frames)
 
   else if (_bpp == 8)
   {
+#if defined (ESP32) && defined (CONFIG_SPIRAM_SUPPORT)
+    if ( psramFound() ) _img8_1 = ( uint8_t*) ps_calloc(w * h + 1, sizeof(uint8_t));
+    else
+#endif
     _img8_1 = ( uint8_t*) calloc(w * h + 1, sizeof(uint8_t));
 
     if (_img8_1)
@@ -103,7 +113,11 @@ void* TFT_eSprite::createSprite(int16_t w, int16_t h, uint8_t frames)
 
     if (frames > 2) frames = 2; // Currently restricted to 2 frame buffers
     if (frames < 1) frames = 1;
-    _img8 = ( uint8_t*) calloc(frames * (w>>3) * h + frames, sizeof(uint8_t)); // extra pixel added
+#if defined (ESP32) && defined (CONFIG_SPIRAM_SUPPORT)
+    if ( psramFound() ) _img8 = ( uint8_t*) ps_calloc(frames * (w>>3) * h + frames, sizeof(uint8_t));
+    else
+#endif
+    _img8 = ( uint8_t*) calloc(frames * (w>>3) * h + frames, sizeof(uint8_t));
 
     if (_img8)
     {
@@ -643,7 +657,21 @@ void TFT_eSprite::scroll(int16_t dx, int16_t dy)
       fyp += iw;
     }
   }
-  else return; // TODO add scroll for 1 bpp
+  else if (_bpp == 1)
+  {
+    if (dx >  0) { tx += w; fx += w; } // Start from right edge
+    while (h--)
+    { // move pixels one by one
+      for (uint16_t xp = 0; xp < w; xp++)
+      {
+        if (dx <= 0) drawPixel(tx + xp, ty, readPixel(fx + xp, fy));
+        if (dx >  0) drawPixel(tx - xp, ty, readPixel(fx - xp, fy));
+      }
+      if (dy <= 0)  { ty++; fy++; }
+      else  { ty--; fy--; }
+    }
+  }
+  else return; // Not 1, 8 or 16 bpp
 
   // Fill the gap left by the scrolling
   if (dx > 0) fillRect(_sx, _sy, dx, _sh, _scolor);
@@ -932,11 +960,14 @@ void TFT_eSprite::fillRect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t 
 {
   if (!_created ) return;
 
+  if ((x >= _iwidth) || (y >= _iheight)) return;
+  
   if (x < 0) { w += x; x = 0; }
+  if (y < 0) { h += y; y = 0; }
 
-  if ((x < 0) || (y < 0) || (x >= _iwidth) || (y >= _iheight)) return;
   if ((x + w) > _iwidth)  w = _iwidth  - x;
   if ((y + h) > _iheight) h = _iheight - y;
+
   if ((w < 1) || (h < 1)) return;
 
   int32_t yp = _iwidth * y + x;
@@ -1473,10 +1504,10 @@ void TFT_eSprite::drawGlyph(uint16_t code)
     if (code == '\n') {
       if (_created)
       {
-      this->cursor_x = 0;
-      this->cursor_y += this->gFont.yAdvance;
-      if (this->cursor_y >= _height) this->cursor_y = 0;
-      return;
+        this->cursor_x = 0;
+        this->cursor_y += this->gFont.yAdvance;
+        if (this->cursor_y >= _height) this->cursor_y = 0;
+        return;
       }
       else
       {
@@ -1511,7 +1542,7 @@ void TFT_eSprite::drawGlyph(uint16_t code)
 
     uint8_t pbuffer[this->gWidth[gNum]];
 
-    uint16_t xs = 0;
+    int16_t  xs = 0;
     uint16_t dl = 0;
 
     for (int y = 0; y < this->gHeight[gNum]; y++)
@@ -1525,7 +1556,8 @@ void TFT_eSprite::drawGlyph(uint16_t code)
           if (pixel != 0xFF)
           {
             if (dl) { drawFastHLine( xs, y + this->cursor_y + this->gFont.maxAscent - this->gdY[gNum], dl, fg); dl = 0; }
-            if (pixel>127) drawPixel(x + this->cursor_x + this->gdX[gNum], y + this->cursor_y + this->gFont.maxAscent - this->gdY[gNum], alphaBlend(pixel, fg, bg));
+            if (_bpp != 1) drawPixel(x + this->cursor_x + this->gdX[gNum], y + this->cursor_y + this->gFont.maxAscent - this->gdY[gNum], alphaBlend(pixel, fg, bg));
+            else if (pixel>127) drawPixel(x + this->cursor_x + this->gdX[gNum], y + this->cursor_y + this->gFont.maxAscent - this->gdY[gNum], fg);
           }
           else
           {

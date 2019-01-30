@@ -19,6 +19,9 @@
 //#define ILI9163_DRIVER
 //#define S6D02A1_DRIVER
 //#define RPI_ILI9486_DRIVER // 20MHz maximum SPI
+//#define HX8357D_DRIVER
+//#define ILI9481_DRIVER
+//#define ILI9486_DRIVER
 #define ILI9488_DRIVER
 
 // For M5Stack ESP32 module with integrated display ONLY, remove // in line below
@@ -53,7 +56,7 @@
 // We must use hardware SPI, a minimum of 3 GPIO pins is needed.
 // Typical setup for ESP8266 NodeMCU ESP-12 is :
 //
-// Display SDO/MISO  to NodeMCU pin D6 (or leave disconnected if not reading TFT)
+// Display SDO/MISO  to NodeMCU pin D6 (leave TFT SDO disconnected if other SPI devices share MISO)
 // Display LED       to NodeMCU pin VIN (or 5V, see below)
 // Display SCK       to NodeMCU pin D5
 // Display SDI/MOSI  to NodeMCU pin D7
@@ -114,7 +117,7 @@
 // For ESP32 Dev board (only tested with ILI9341 display)
 // The hardware SPI can be mapped to any pins
 
-#define TFT_MISO 19
+#define TFT_MISO 19 // (leave TFT SDO disconnected if other SPI devices share MISO)
 #define TFT_MOSI 23
 #define TFT_SCLK 18
 #define TFT_CS    15  // Chip select control pin

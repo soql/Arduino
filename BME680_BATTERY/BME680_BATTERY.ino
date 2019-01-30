@@ -29,8 +29,7 @@
 
 #define SEALEVELPRESSURE_HPA (1013.25)
 
-
-#define FW_VERSION 6
+#define FW_VERSION 8
 #define FW_INFO "Czujnik pogodowy na zewnątrz"
 
 #define WIFI_COUNT 3
@@ -47,7 +46,7 @@ IPAddress mqttServerIP(192,168,2,3);
 
 /*NtpClient*/
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, mqttServerIP);
+NTPClient timeClient(ntpUDP, "192.168.2.3");
 
 
 /*IPAddress mqttServerIP(79,190,140,82);*/   
@@ -72,7 +71,9 @@ void setup() {
  read();
  int rawValue=readADC();
  double batteryStatus=convertADC(rawValue);
- timeClient.update();
+ while(!timeClient.update()){
+  delay(100);
+ }
  delay(2000);
  String payload = "{";
   payload += "\"temperature\":"; payload += bme.temperature; payload += ",";

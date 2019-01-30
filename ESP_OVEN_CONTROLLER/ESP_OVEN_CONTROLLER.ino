@@ -3,8 +3,10 @@
 #include <PubSubClient.h>
 #include <Servo.h>
 #include <soql_tools.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
 
-#define FW_VERSION 7
+#define FW_VERSION 14
 #define FW_INFO "Kontroller pieca zjc"
 
 wifi_struct wifi[2]={
@@ -12,6 +14,9 @@ wifi_struct wifi[2]={
   {"ZJC-W","820813130882"}
 };
 
+/*NtpClient*/
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "192.168.1.168", 0, 60000);
 
 #define TOKEN "ESP8266_OVEN_CONTROLLER"
 
@@ -26,7 +31,7 @@ static const int DHT_SENSOR_PIN = D4;
 
 #define DHT_SENSOR_TYPE DHT_TYPE_22
 
-DHT_nonblocking dht_sensor( DHT_SENSOR_PIN, DHT_SENSOR_TYPE );
+DHT_nonblocking* dht_sensor;
 
 IPAddress mqttServerIP(192,168,1,168);
 /*IPAddress mqttServerIP(91,239,168,107);*/
@@ -50,6 +55,7 @@ void setup() {
  connectToMQTT(&client, mqttServerIP, TOKEN, callback, onConnect);
  sendToMqtt(&client,"/telemetry/technical/info", generateTechInfo(FW_VERSION, FW_INFO));
  checkForUpdates(FW_VERSION);
+ dht_sensor= new DHT_nonblocking( DHT_SENSOR_PIN, DHT_SENSOR_TYPE );
  pinMode(SERVO_PORT, OUTPUT);
  delay(1000); 
  termostat.attach(SERVO_PORT);
@@ -85,6 +91,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
 void loop() {  
   ConnectToAP(wifi, 2);
   connectToMQTT(&client, mqttServerIP, TOKEN, callback, onConnect);
+  timeClient.begin();
+  timeClient.update();
   client.loop();
   if( measure_environment( &temperature, &humidity ) == true )
   {
@@ -92,10 +100,10 @@ void loop() {
     Serial.print( temperature, 1 );
     Serial.print( " deg. C, H = " );
     Serial.print( humidity, 1 );
-    Serial.println( "%" );
+    Serial.println( "%" );        
     generateAndSend();
-    
   } 
+  
 }
 
 void generateAndSend(){
@@ -104,6 +112,7 @@ void generateAndSend(){
     payload += "\"humidity\":"; payload += humidity; payload += ",";
     payload += "\"termostatValue\":"; payload += termostatValue; payload += ",";
     payload += "\"ap\":\""; payload += WiFi.SSID();payload += "\",";
+    payload += "\"time\":"; payload += timeClient.getEpochTime();payload += ",";
     payload += "\"rssi\":"; payload += WiFi.RSSI();
     payload += "}";
     sendToMqtt(&client,OUT_TOPIC,payload); 
@@ -117,7 +126,7 @@ static bool measure_environment( float *temperature, float *humidity )
   
   if( millis( ) - measurement_timestamp > 15000ul )
   {
-    if( dht_sensor.measure( temperature, humidity ) == true )
+    if( dht_sensor->measure( temperature, humidity ) == true )
     {
       measurement_timestamp = millis( );
       return( true );

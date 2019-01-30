@@ -1,22 +1,33 @@
-
-#include <ESP8266WiFi.h>
 #include <PubSubClient.h>
-
+#include <ESP8266WiFi.h>
+#include <soql_tools.h>
 #define WIFI_AP "ZJC-N"
 #define WIFI_PASSWORD "820813130882"
 
-#define TOKEN "ESP8266_HC_SR505_TEST"
+#define FW_VERSION 5
+#define FW_INFO "Czujniki ruchu - wjazd zalesie"
+
+#define WIFI_COUNT 2
+
+wifi_struct wifi[WIFI_COUNT] = {    
+  {"ZJC-N"          , "820813130882"},
+  {"ZJC-S"          , "820813130882"}
+};
+
+
+#define TOKEN "WEMOS_D1_PRO_MOVE_TRIGGER"
+
 
 IPAddress mqttServerIP(192,168,1,168);  
 /*IPAddress mqttServerIP(79,190,140,82);*/   
 WiFiClient wifiClient;
 
-void ConnectToAP();
-void sendToMQTT(String dataToSend);
+
+/*MQTT**/
+PubSubClient client(wifiClient);
 
 void setup() {
- Serial.begin(115200);
- delay(10);  
+   delay(10);  
    pinMode(D5, INPUT);
    pinMode(D7, INPUT);
    
@@ -28,99 +39,74 @@ void setup() {
    
    digitalWrite (D8, LOW);
    digitalWrite (D0, LOW);
+   initSerial(115200);
+   ConnectToAP(wifi, WIFI_COUNT);  
+   checkForUpdates(FW_VERSION);
+   connectToMQTT(&client, mqttServerIP, TOKEN, NULL, NULL);  
+   sendToMqtt(&client,"/telemetry/technical/info", generateTechInfo(FW_VERSION, FW_INFO));
+
 }
 int prevState=0;
 int prevState2=0;
 void loop() {
+  ConnectToAP(wifi, WIFI_COUNT);
+  connectToMQTT(&client, mqttServerIP, TOKEN, NULL, NULL);  
    pinMode(D5, INPUT);
-  ConnectToAP(); 
+  
    int actState=digitalRead(D5);   
    int actState2=digitalRead(D7);   
    if(prevState==0 && actState==1){
     Serial.println("Wykryto ruch");
-    String payload = "on"  ;      
-    prevState=actState;
+    String payload = "{sensor: 1, state: on}"  ;      
+    prevState=actState;    
+    sendToMqtt(&client,"/telemetry/movment" ,payload);     
+    if(actState2==1){
+      Serial.println("Wyjazd");
+    String payload = "{wyjazd}"  ;          
     digitalWrite (D8, HIGH);
-    sendToMQTT(payload); 
+    sendToMqtt(&client,"/telemetry/movment" ,payload);     
+    }
     
    }
    if(prevState==1 && actState==0){
     Serial.println("Koniec sygnału");
-    String payload = "off"    ;    
+    String payload = "{sensor: 1, state: off}"    ;    
     prevState=actState;
     digitalWrite (D8, LOW);
-    sendToMQTT(payload);     
+    sendToMqtt(&client,"/telemetry/movment" ,payload);     
    }
   if(prevState2==0 && actState2==1){
     Serial.println("Wykryto ruch 2");
-    String payload = "on"  ;      
-    prevState2=actState2;
+    String payload = "{sensor: 2, state: on}"  ;      
+    prevState2=actState2;    
+    sendToMqtt(&client,"/telemetry/movment" ,payload);     
+    if(actState==1){
+      Serial.println("Wjazd");
+    String payload = "{wjazd}"  ;          
     digitalWrite (D0, HIGH);
-    sendToMQTT(payload); 
+    sendToMqtt(&client,"/telemetry/movment" ,payload);     
+    }
     
    }
+   
    if(prevState2==1 && actState2==0){
     Serial.println("Koniec sygnału 2");
-    String payload = "off"    ;    
+    String payload = "{sensor: 2, state: off}"    ;    
     prevState2=actState2;
     digitalWrite (D0, LOW);
-    sendToMQTT(payload);     
+    sendToMqtt(&client,"/telemetry/movment" ,payload);     
    }
    
-   
-   delay(100);
-}
-
-
-void ConnectToAP()
-{
-  int c=0;
-  if(WiFi.status() == WL_CONNECTED)
-    return;
-  Serial.print("Connecting to AP ...");
-  // attempt to connect to WiFi network
-  WiFi.begin(WIFI_AP, WIFI_PASSWORD);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(200);
-    Serial.print(".");
-    c++;
-    if(c>=40){
-      ESP.reset();
-    }
   }
-  Serial.println("Connected to AP");
+   if(prevState==0 && actState==1 && actState2==1){    
+    String payload = "{wyjazd}"  ;          
+    digitalWrite (D8, HIGH);
+    sendToMqtt(&client,"/telemetry/movment" ,payload);     
+    
+   }
+     
 }
 
-/*MQTT**/
-PubSubClient client(wifiClient);
 
-
-void sendToMQTT(String dataToSend){
- ConnectToAP();
-  int i=0;
-  client.setServer( mqttServerIP, 1883 );  
-  Serial.print("Connecting to ThingsBoard node ...");
-  while ( !client.connected() ) {
-    if ( client.connect("ESP8266 Device", TOKEN, NULL) ) {
-      Serial.println( "[DONE]" );
-    } else {
-      i++;
-      Serial.print( "[FAILED] [ rc = " );
-      Serial.print( client.state() );
-      Serial.println( " : retrying in 5 seconds]" );
-      // Wait 5 seconds before retrying
-      delay( 100 );
-      if(i>=10){
-        Serial.println("[ERROR] Cannot connect to MQTT Server");
-        ESP.reset();        
-      }
-    }
-  }
-  char attributes[100];
-  dataToSend.toCharArray( attributes, 100 );
-  client.publish( "/telemetry/sonoff1/switch1/cmd", attributes );
-  Serial.print( "Send to MQTT:" );
-  Serial.println( attributes );   
-}
 
 

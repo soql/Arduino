@@ -16,7 +16,7 @@
 
 // Only define one driver, the other ones must be commented out
 //#define ILI9341_DRIVER
-#define ST7735_DRIVER
+//#define ST7735_DRIVER
 //#define ILI9163_DRIVER
 //#define S6D02A1_DRIVER
 //#define RPI_ILI9486_DRIVER // 20MHz maximum SPI
@@ -24,15 +24,29 @@
 //#define ILI9481_DRIVER
 //#define ILI9486_DRIVER
 //#define ILI9488_DRIVER
-//#define ST7789_DRIVER
+#define ST7789_DRIVER // Define the screen size below for this display
+//#define R61581_DRIVER
+
+// Some displays support SPI reads via the MISO pin, if the display has a single
+// bi-directional SDA pin the library will try to use bit banging to read the line
+// To use the SDA line for reading data from the TFT uncomment the following line:
+// #define TFT_SDA_READ
 
 // For M5Stack ESP32 module with integrated display ONLY, remove // in line below
 //#define M5STACK
 
-// For ST7735  and ILI9163 ONLY, define the pixel width and height in portrait orientation
-#define TFT_WIDTH  128
-#define TFT_HEIGHT 160
-//#define TFT_HEIGHT 128
+// For ST7789 ONLY, define the colour order IF the blue and red are swapped on your display
+//#define TFT_RGB_ORDER TFT_RGB  // Colour order Red-Green-Blue
+//#define TFT_RGB_ORDER TFT_BGR  // Colour order Blue-Green-Red
+
+// For ST7789, ST7735 and ILI9163 ONLY, define the pixel width and height in portrait orientation
+// #define TFT_WIDTH  80
+// #define TFT_WIDTH  128
+ #define TFT_WIDTH  240 // ST7789 240 x 240 and 240 x 320
+// #define TFT_HEIGHT 160
+// #define TFT_HEIGHT 128
+ #define TFT_HEIGHT 240 // ST7789 240 x 240
+// #define TFT_HEIGHT 320 // ST7789 240 x 320
 
 // For ST7735 ONLY, define the type of display, originally this was based on the
 // colour of the tab on the screen protector film but this is not always true, so try
@@ -41,13 +55,15 @@
 // Comment out ALL BUT ONE of these options for a ST7735 display driver, save this
 // this User_Setup file, then rebuild and upload the sketch to the board again:
 
-//#define ST7735_INITB
-//#define ST7735_GREENTAB
-#define ST7735_GREENTAB2
-//#define ST7735_GREENTAB3
-//#define ST7735_GREENTAB128 // For 128 x 128 display
-//#define ST7735_REDTAB
-//#define ST7735_BLACKTAB
+// #define ST7735_INITB
+// #define ST7735_GREENTAB
+// #define ST7735_GREENTAB2
+// #define ST7735_GREENTAB3
+// #define ST7735_GREENTAB128    // For 128 x 128 display
+// #define ST7735_GREENTAB160x80 // For 160 x 80 display (BGR, inverted, 26 offset)
+// #define ST7735_REDTAB
+// #define ST7735_BLACKTAB
+// #define ST7735_REDTAB160x80 // For 160 x 80 display (24 offset) (https://www.aliexpress.com/item/ShengYang-1pcs-IPS-0-96-inch-7P-SPI-HD-65K-Full-Color-OLED-Module-ST7735-Drive/32918394604.html)
 
 // ##################################################################################
 //
@@ -89,10 +105,12 @@
 // ###### EDIT THE PIN NUMBERS IN THE LINES FOLLOWING TO SUIT YOUR ESP8266 SETUP ######
 
 // For NodeMCU - use pin numbers in the form PIN_Dx where Dx is the NodeMCU pin designation
-#define TFT_CS   PIN_D8  // Chip select control pin D8
+//#define TFT_CS   PIN_D8  // Chip select control pin D8
 #define TFT_DC   PIN_D3  // Data Command control pin
 #define TFT_RST  PIN_D4  // Reset pin (could connect to NodeMCU RST, see next line)
-//#define TFT_RST  -1  // Set TFT_RST to -1 if the display RESET is connected to NodeMCU RST or 3.3V
+//#define TFT_RST  -1    // Set TFT_RST to -1 if the display RESET is connected to NodeMCU RST or 3.3V
+
+//#define TFT_BL PIN_D1  // LED back-light (only for ST7789 with backlight control pin)
 
 //#define TOUCH_CS PIN_D2     // Chip select pin (T_CS) of touch screen
 
@@ -105,14 +123,15 @@
 // but saves pins for other functions.
 // Use NodeMCU SD0=MISO, SD1=MOSI, CLK=SCLK to connect to TFT in overlap mode
 
+// In ESP8266 overlap mode the following must be defined
+//#define TFT_SPI_OVERLAP
+
 // In ESP8266 overlap mode the TFT chip select MUST connect to pin D3
 //#define TFT_CS   PIN_D3
 //#define TFT_DC   PIN_D5  // Data Command control pin
 //#define TFT_RST  PIN_D4  // Reset pin (could connect to NodeMCU RST, see next line)
 //#define TFT_RST  -1  // Set TFT_RST to -1 if the display RESET is connected to NodeMCU RST or 3.3V
 
-// In ESP8266 overlap mode the following must be defined
-//#define TFT_SPI_OVERLAP
 
 // ###### EDIT THE PIN NUMBERS IN THE LINES FOLLOWING TO SUIT YOUR ESP32 SETUP   ######
 
@@ -122,10 +141,15 @@
 //#define TFT_MISO 19
 //#define TFT_MOSI 23
 //#define TFT_SCLK 18
-//#define TFT_CS    15  // Chip select control pin
+//#define TFT_CS   15  // Chip select control pin
 //#define TFT_DC    2  // Data Command control pin
 //#define TFT_RST   4  // Reset pin (could connect to RST pin)
 //#define TFT_RST  -1  // Set TFT_RST to -1 if display RESET is connected to ESP32 board RST
+//#define TFT_BL   32  // LED back-light (only for ST7789 with backlight control pin)
+
+//#define TOUCH_CS 21     // Chip select pin (T_CS) of touch screen
+
+//#define TFT_WR 22    // Write strobe for modified Raspberry Pi TFT only
 
 // For the M5Stack module use these #define lines
 //#define TFT_MISO 19
@@ -134,11 +158,7 @@
 //#define TFT_CS   14  // Chip select control pin
 //#define TFT_DC   27  // Data Command control pin
 //#define TFT_RST  33  // Reset pin (could connect to Arduino RESET pin)
-//#define TFT_BL   32  // LED back-light
-
-//#define TOUCH_CS 21     // Chip select pin (T_CS) of touch screen
-
-//#define TFT_WR 22    // Write strobe for modified Raspberry Pi TFT only
+//#define TFT_BL   32  // LED back-light (required for M5Stack)
 
 // ######       EDIT THE PINs BELOW TO SUIT YOUR ESP32 PARALLEL TFT SETUP        ######
 
@@ -236,7 +256,8 @@
 // #define SPI_FREQUENCY  40000000 // Maximum to use SPIFFS
 // #define SPI_FREQUENCY  80000000
 
-#define SPI_READ_FREQUENCY  20000000 // Optional reduced SPI frequency for reading TFT
+// Optional reduced SPI frequency for reading TFT
+#define SPI_READ_FREQUENCY  20000000
 
 // The XPT2046 requires a lower SPI clock rate of 2.5MHz so we define that here:
 #define SPI_TOUCH_FREQUENCY  2500000

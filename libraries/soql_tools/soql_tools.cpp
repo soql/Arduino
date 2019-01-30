@@ -12,7 +12,7 @@ void goDeepSleep(int timeInSeconds, boolean deep){
 		 ESP.deepSleep(1000000*timeInSeconds);
 	}else{
 	 delay(1000*timeInSeconds);
-	 ESP.reset();
+	 ESP.restart();
 	}
 }
 
@@ -49,7 +49,7 @@ int ConnectToAP(wifi_struct wifilist[], int wifisize)
     return 1;
   }
   Serial.println("Cannot start wifi connection :-(");
-  ESP.reset();
+  ESP.restart();
   return 0;
 }
 
@@ -77,7 +77,7 @@ void connectToMQTT(PubSubClient* client, IPAddress mqttServerIP, char* token, vo
        Serial.print(".");
          if(retry>=10){
         Serial.println("[ERROR] Cannot connect to MQTT Server");
-        ESP.reset();
+        ESP.restart();
       }
      }
    }

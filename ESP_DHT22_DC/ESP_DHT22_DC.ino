@@ -1,5 +1,5 @@
 /*#include "weedroom.h"*/
-#include "przem_livingroom.h"
+#include "bathroom_floor.h"
 #include "DHT.h"
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
@@ -28,6 +28,11 @@ void setup() {
  connectToMQTT(&client, mqttServerIP, TOKEN, NULL, NULL);  
  sendToMqtt(&client,"/telemetry/technical/info", generateTechInfo(FW_VERSION, FW_INFO));
  timeClient.begin();
+ 
+ while(!timeClient.update()){
+  delay(100);
+ }
+ 
  struct dhtresults_struct dht22=getResultsFromDHT22();  
  
  String payload = "{";
@@ -39,12 +44,12 @@ void setup() {
   
   payload += "}";
  sendToMqtt(&client,OUT_TOPIC, payload);
- goDeepSleep(30,true);
+ goDeepSleep(30,real_deepsleep);
 }
 
  
 void loop() {
-  // put your main code here, to run repeatedly:
+  setup();
 
 }
 
@@ -75,7 +80,7 @@ struct dhtresults_struct getResultsFromDHT22(){
         return dhtresults;
       }
   }
- goDeepSleep(30,true);
+  goDeepSleep(30,real_deepsleep);
   return dhtresults;
 }
 

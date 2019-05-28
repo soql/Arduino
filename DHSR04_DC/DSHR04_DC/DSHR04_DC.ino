@@ -14,7 +14,7 @@ struct dhtresults_struct {
 #define DHTPIN D6
 #define DHTTYPE DHT22
 
-#define FW_VERSION 7
+#define FW_VERSION 8
 #define FW_INFO "Kontroller poziomu peletu"
 
 #define WIFI_COUNT 3
@@ -70,10 +70,13 @@ void setup() {
   
    pinMode(trigPin, OUTPUT);
    pinMode(echoPin, INPUT);
-    timeClient.begin();
-    timeClient.update();
-    struct dhtresults_struct dht22=getResultsFromDHT22();  
-     int results[20];
+   timeClient.begin();
+   while(!timeClient.update()){
+      delay(100);
+   }
+   struct dhtresults_struct dht22=getResultsFromDHT22();  
+   int sum=0;
+   /*int results[20];
 
     
     
@@ -82,11 +85,10 @@ void setup() {
       delay(1000);
     }
     isort(results, 20);
-
-    int sum=0;
+    ;
     for(int i=5; i<15; i++){
       sum+=results[i];
-    }
+    }*/
 
       
     String payload = "{";

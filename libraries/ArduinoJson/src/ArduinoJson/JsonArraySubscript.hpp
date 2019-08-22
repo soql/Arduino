@@ -1,5 +1,5 @@
 // ArduinoJson - arduinojson.org
-// Copyright Benoit Blanchon 2014-2018
+// Copyright Benoit Blanchon 2014-2019
 // MIT License
 
 #pragma once
@@ -16,18 +16,18 @@ namespace ArduinoJson {
 namespace Internals {
 class JsonArraySubscript : public JsonVariantBase<JsonArraySubscript> {
  public:
-  FORCE_INLINE JsonArraySubscript(JsonArray array, size_t index)
+  FORCE_INLINE JsonArraySubscript(JsonArray& array, size_t index)
       : _array(array), _index(index) {}
 
   FORCE_INLINE JsonArraySubscript& operator=(const JsonArraySubscript& src) {
-    _array.set(_index, src.as<JsonVariant>());
+    _array.set(_index, src);
     return *this;
   }
 
   // Replaces the value
   //
   // operator=(const TValue&)
-  // TValue = bool, long, int, short, float, double, serialized, JsonVariant,
+  // TValue = bool, long, int, short, float, double, RawJson, JsonVariant,
   //          std::string, String, JsonArray, JsonObject
   template <typename T>
   FORCE_INLINE JsonArraySubscript& operator=(const T& src) {
@@ -43,8 +43,8 @@ class JsonArraySubscript : public JsonVariantBase<JsonArraySubscript> {
     return *this;
   }
 
-  FORCE_INLINE bool isNull() const {
-    return _index >= _array.size();
+  FORCE_INLINE bool success() const {
+    return _index < _array.size();
   }
 
   template <typename T>
@@ -60,7 +60,7 @@ class JsonArraySubscript : public JsonVariantBase<JsonArraySubscript> {
   // Replaces the value
   //
   // bool set(const TValue&)
-  // TValue = bool, long, int, short, float, double, serialized, JsonVariant,
+  // TValue = bool, long, int, short, float, double, RawJson, JsonVariant,
   //          std::string, String, JsonArray, JsonObject
   template <typename TValue>
   FORCE_INLINE bool set(const TValue& value) {
@@ -73,14 +73,17 @@ class JsonArraySubscript : public JsonVariantBase<JsonArraySubscript> {
   FORCE_INLINE bool set(TValue* value) {
     return _array.set(_index, value);
   }
-
-  template <typename Visitor>
-  void visit(Visitor& visitor) const {
-    return _array.get<JsonVariant>(_index).visit(visitor);
+  //
+  // bool set(TValue, uint8_t decimals);
+  // TValue = float, double
+  template <typename TValue>
+  DEPRECATED("Second argument is not supported anymore")
+  FORCE_INLINE bool set(const TValue& value, uint8_t) {
+    return _array.set(_index, value);
   }
 
  private:
-  JsonArray _array;
+  JsonArray& _array;
   const size_t _index;
 };
 
@@ -95,6 +98,13 @@ inline const JsonArraySubscript JsonVariantSubscripts<TImpl>::operator[](
     size_t index) const {
   return impl()->template as<JsonArray>()[index];
 }
+
+#if ARDUINOJSON_ENABLE_STD_STREAM
+inline std::ostream& operator<<(std::ostream& os,
+                                const JsonArraySubscript& source) {
+  return source.printTo(os);
+}
+#endif
 }  // namespace Internals
 
 inline Internals::JsonArraySubscript JsonArray::operator[](size_t index) {
@@ -103,7 +113,7 @@ inline Internals::JsonArraySubscript JsonArray::operator[](size_t index) {
 
 inline const Internals::JsonArraySubscript JsonArray::operator[](
     size_t index) const {
-  return Internals::JsonArraySubscript(*this, index);
+  return Internals::JsonArraySubscript(*const_cast<JsonArray*>(this), index);
 }
 }  // namespace ArduinoJson
 

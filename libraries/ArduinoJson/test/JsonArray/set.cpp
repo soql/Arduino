@@ -1,5 +1,5 @@
 // ArduinoJson - arduinojson.org
-// Copyright Benoit Blanchon 2014-2018
+// Copyright Benoit Blanchon 2014-2019
 // MIT License
 
 #include <ArduinoJson.h>
@@ -8,108 +8,91 @@
 using namespace Catch::Matchers;
 
 TEST_CASE("JsonArray::set()") {
-  DynamicJsonDocument doc;
-  JsonArray array = doc.to<JsonArray>();
-  array.add(0);
+  DynamicJsonBuffer _jsonBuffer;
+  JsonArray& _array = _jsonBuffer.createArray();
+  _array.add(0);
 
   SECTION("int") {
-    array.set(0, 123);
-    REQUIRE(123 == array[0].as<int>());
-    REQUIRE(array[0].is<int>());
-    REQUIRE_FALSE(array[0].is<bool>());
+    _array.set(0, 123);
+    REQUIRE(123 == _array[0].as<int>());
+    REQUIRE(_array[0].is<int>());
+    REQUIRE_FALSE(_array[0].is<bool>());
   }
 
   SECTION("double") {
-    array.set(0, 123.45);
-    REQUIRE(123.45 == array[0].as<double>());
-    REQUIRE(array[0].is<double>());
-    REQUIRE_FALSE(array[0].is<int>());
+    _array.set(0, 123.45);
+    REQUIRE(123.45 == _array[0].as<double>());
+    REQUIRE(_array[0].is<double>());
+    REQUIRE_FALSE(_array[0].is<int>());
   }
 
   SECTION("bool") {
-    array.set(0, true);
-    REQUIRE(true == array[0].as<bool>());
-    REQUIRE(array[0].is<bool>());
-    REQUIRE_FALSE(array[0].is<int>());
+    _array.set(0, true);
+    REQUIRE(true == _array[0].as<bool>());
+    REQUIRE(_array[0].is<bool>());
+    REQUIRE_FALSE(_array[0].is<int>());
   }
 
   SECTION("const char*") {
-    array.set(0, "hello");
-    REQUIRE_THAT(array[0].as<const char*>(), Equals("hello"));
-    REQUIRE(array[0].is<const char*>());
-    REQUIRE_FALSE(array[0].is<int>());
+    _array.set(0, "hello");
+    REQUIRE_THAT(_array[0].as<const char*>(), Equals("hello"));
+    REQUIRE(_array[0].is<const char*>());
+    REQUIRE_FALSE(_array[0].is<int>());
   }
-
-#ifdef HAS_VARIABLE_LENGTH_ARRAY
-  SECTION("set()") {
-    int i = 16;
-    char vla[i];
-    strcpy(vla, "world");
-
-    array.add("hello");
-    array.set(0, vla);
-
-    REQUIRE(std::string("world") == array[0]);
-  }
-#endif
 
   SECTION("nested array") {
-    DynamicJsonDocument doc2;
-    JsonArray arr = doc2.to<JsonArray>();
+    JsonArray& arr = _jsonBuffer.createArray();
 
-    array.set(0, arr);
+    _array.set(0, arr);
 
-    REQUIRE(arr == array[0].as<JsonArray>());
-    REQUIRE(array[0].is<JsonArray>());
-    REQUIRE_FALSE(array[0].is<int>());
+    REQUIRE(&arr == &_array[0].as<JsonArray&>());
+    REQUIRE(_array[0].is<JsonArray&>());
+    REQUIRE_FALSE(_array[0].is<int>());
   }
 
   SECTION("nested object") {
-    DynamicJsonDocument doc2;
-    JsonObject obj = doc2.to<JsonObject>();
+    JsonObject& obj = _jsonBuffer.createObject();
 
-    array.set(0, obj);
+    _array.set(0, obj);
 
-    REQUIRE(obj == array[0].as<JsonObject>());
-    REQUIRE(array[0].is<JsonObject>());
-    REQUIRE_FALSE(array[0].is<int>());
+    REQUIRE(&obj == &_array[0].as<JsonObject&>());
+    REQUIRE(_array[0].is<JsonObject&>());
+    REQUIRE_FALSE(_array[0].is<int>());
   }
 
   SECTION("array subscript") {
-    DynamicJsonDocument doc2;
-    JsonArray arr = doc2.to<JsonArray>();
+    JsonArray& arr = _jsonBuffer.createArray();
     arr.add("hello");
 
-    array.set(0, arr[0]);
+    _array.set(0, arr[0]);
 
-    REQUIRE_THAT(array[0].as<char*>(), Equals("hello"));
+    REQUIRE_THAT(_array[0].as<char*>(), Equals("hello"));
   }
 
   SECTION("object subscript") {
-    DynamicJsonDocument doc2;
-    JsonObject obj = doc2.to<JsonObject>();
+    JsonObject& obj = _jsonBuffer.createObject();
     obj["x"] = "hello";
 
-    array.set(0, obj["x"]);
+    _array.set(0, obj["x"]);
 
-    REQUIRE_THAT(array[0].as<char*>(), Equals("hello"));
+    REQUIRE_THAT(_array[0].as<char*>(), Equals("hello"));
   }
 
   SECTION("should not duplicate const char*") {
-    array.set(0, "world");
+    _array.set(0, "world");
     const size_t expectedSize = JSON_ARRAY_SIZE(1);
-    REQUIRE(expectedSize == doc.memoryUsage());
+    REQUIRE(expectedSize == _jsonBuffer.size());
   }
 
   SECTION("should duplicate char*") {
-    array.set(0, const_cast<char*>("world"));
+    _array.set(0, const_cast<char*>("world"));
     const size_t expectedSize = JSON_ARRAY_SIZE(1) + 6;
-    REQUIRE(expectedSize == doc.memoryUsage());
+    REQUIRE(expectedSize == _jsonBuffer.size());
   }
 
   SECTION("should duplicate std::string") {
-    array.set(0, std::string("world"));
+    _array.set(0, std::string("world"));
     const size_t expectedSize = JSON_ARRAY_SIZE(1) + 6;
-    REQUIRE(expectedSize == doc.memoryUsage());
+    REQUIRE(expectedSize == _jsonBuffer.size());
   }
 }

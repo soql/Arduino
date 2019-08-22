@@ -1,5 +1,5 @@
 // ArduinoJson - arduinojson.org
-// Copyright Benoit Blanchon 2014-2018
+// Copyright Benoit Blanchon 2014-2019
 // MIT License
 //
 // This example shows how to deserialize a JSON document with ArduinoJson.
@@ -11,17 +11,17 @@ void setup() {
   Serial.begin(9600);
   while (!Serial) continue;
 
-  // Allocate the JSON document
+  // Memory pool for JSON object tree.
   //
-  // Inside the brackets, 200 is the size of the memory pool in bytes.
+  // Inside the brackets, 200 is the size of the pool in bytes.
   // Don't forget to change this value to match your JSON document.
   // Use arduinojson.org/assistant to compute the capacity.
-  StaticJsonDocument<200> doc;
+  StaticJsonBuffer<200> jsonBuffer;
 
-  // StaticJsonDocument<N> allocates memory on the stack, it can be
-  // replaced by DynamicJsonObject which allocates in the heap.
+  // StaticJsonBuffer allocates memory on the stack, it can be
+  // replaced by DynamicJsonBuffer which allocates in the heap.
   //
-  // DynamicJsonObject doc(200);
+  // DynamicJsonBuffer  jsonBuffer(200);
 
   // JSON input string.
   //
@@ -31,18 +31,18 @@ void setup() {
   char json[] =
       "{\"sensor\":\"gps\",\"time\":1351824120,\"data\":[48.756080,2.302038]}";
 
-  // Deserialize the JSON document
-  DeserializationError error = deserializeJson(doc, json);
+  // Root of the object tree.
+  //
+  // It's a reference to the JsonObject, the actual bytes are inside the
+  // JsonBuffer with all the other nodes of the object tree.
+  // Memory is freed when jsonBuffer goes out of scope.
+  JsonObject& root = jsonBuffer.parseObject(json);
 
   // Test if parsing succeeds.
-  if (error) {
-    Serial.print(F("deserializeJson() failed: "));
-    Serial.println(error.c_str());
+  if (!root.success()) {
+    Serial.println("parseObject() failed");
     return;
   }
-
-  // Get the root object in the document
-  JsonObject root = doc.as<JsonObject>();
 
   // Fetch values.
   //
@@ -64,4 +64,15 @@ void loop() {
   // not used in this example
 }
 
-// Visit https://arduinojson.org/v6/example/parser/ for more.
+// See also
+// --------
+//
+// https://arduinojson.org/ contains the documentation for all the functions
+// used above. It also includes an FAQ that will help you solve any
+// deserialization problem.
+//
+// The book "Mastering ArduinoJson" contains a tutorial on deserialization.
+// It begins with a simple example, like the one above, and then adds more
+// features like deserializing directly from a file or an HTTP request.
+// Learn more at https://arduinojson.org/book/
+// Use the coupon code TWENTY for a 20% discount ❤❤❤❤❤

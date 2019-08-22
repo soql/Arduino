@@ -1,39 +1,35 @@
 // ArduinoJson - arduinojson.org
-// Copyright Benoit Blanchon 2014-2018
+// Copyright Benoit Blanchon 2014-2019
 // MIT License
 
 #include <ArduinoJson.h>
 #include <catch.hpp>
 
 TEST_CASE("JsonArray::size()") {
-  DynamicJsonDocument doc;
-  JsonArray array = doc.to<JsonArray>();
-
-  SECTION("InitialSizeIsZero") {
-    REQUIRE(0U == array.size());
-  }
+  DynamicJsonBuffer _jsonBuffer;
+  JsonArray& _array = _jsonBuffer.createArray();
 
   SECTION("increases after add()") {
-    array.add("hello");
-    REQUIRE(1U == array.size());
+    _array.add("hello");
+    REQUIRE(1U == _array.size());
 
-    array.add("world");
-    REQUIRE(2U == array.size());
+    _array.add("world");
+    REQUIRE(2U == _array.size());
   }
 
   SECTION("remains the same after set()") {
-    array.add("hello");
-    REQUIRE(1U == array.size());
+    _array.add("hello");
+    REQUIRE(1U == _array.size());
 
-    array.set(0, "hello");
-    REQUIRE(1U == array.size());
+    _array.set(0, "hello");
+    REQUIRE(1U == _array.size());
   }
 
   SECTION("remains the same after assigment") {
-    array.add("hello");
-    REQUIRE(1U == array.size());
+    _array.add("hello");
+    REQUIRE(1U == _array.size());
 
-    array[0] = "hello";
-    REQUIRE(1U == array.size());
+    _array[0] = "hello";
+    REQUIRE(1U == _array.size());
   }
 }

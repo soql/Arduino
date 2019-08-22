@@ -1,5 +1,6 @@
 /*#include "weedroom.h"*/
-#include "bathroom_floor.h"
+/*#include "bathroom_floor.h"*/
+#include "przem_kotlownia.h"
 #include "DHT.h"
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
@@ -83,4 +84,3 @@ struct dhtresults_struct getResultsFromDHT22(){
   goDeepSleep(30,real_deepsleep);
   return dhtresults;
 }
-

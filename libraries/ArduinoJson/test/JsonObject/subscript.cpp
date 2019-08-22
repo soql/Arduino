@@ -1,216 +1,163 @@
 // ArduinoJson - arduinojson.org
-// Copyright Benoit Blanchon 2014-2018
+// Copyright Benoit Blanchon 2014-2019
 // MIT License
 
 #include <ArduinoJson.h>
 #include <catch.hpp>
 
 TEST_CASE("JsonObject::operator[]") {
-  DynamicJsonDocument doc;
-  JsonObject obj = doc.to<JsonObject>();
+  DynamicJsonBuffer _jsonBuffer;
+  JsonObject& _object = _jsonBuffer.createObject();
 
   SECTION("int") {
-    obj["hello"] = 123;
+    _object["hello"] = 123;
 
-    REQUIRE(123 == obj["hello"].as<int>());
-    REQUIRE(true == obj["hello"].is<int>());
-    REQUIRE(false == obj["hello"].is<bool>());
+    REQUIRE(123 == _object["hello"].as<int>());
+    REQUIRE(true == _object["hello"].is<int>());
+    REQUIRE(false == _object["hello"].is<bool>());
   }
 
   SECTION("volatile int") {  // issue #415
     volatile int i = 123;
-    obj["hello"] = i;
+    _object["hello"] = i;
 
-    REQUIRE(123 == obj["hello"].as<int>());
-    REQUIRE(true == obj["hello"].is<int>());
-    REQUIRE(false == obj["hello"].is<bool>());
+    REQUIRE(123 == _object["hello"].as<int>());
+    REQUIRE(true == _object["hello"].is<int>());
+    REQUIRE(false == _object["hello"].is<bool>());
   }
 
   SECTION("double") {
-    obj["hello"] = 123.45;
+    _object["hello"] = 123.45;
 
-    REQUIRE(true == obj["hello"].is<double>());
-    REQUIRE(false == obj["hello"].is<long>());
-    REQUIRE(123.45 == obj["hello"].as<double>());
+    REQUIRE(true == _object["hello"].is<double>());
+    REQUIRE(false == _object["hello"].is<long>());
+    REQUIRE(123.45 == _object["hello"].as<double>());
   }
 
   SECTION("bool") {
-    obj["hello"] = true;
+    _object["hello"] = true;
 
-    REQUIRE(true == obj["hello"].is<bool>());
-    REQUIRE(false == obj["hello"].is<long>());
-    REQUIRE(true == obj["hello"].as<bool>());
+    REQUIRE(true == _object["hello"].is<bool>());
+    REQUIRE(false == _object["hello"].is<long>());
+    REQUIRE(true == _object["hello"].as<bool>());
   }
 
   SECTION("const char*") {
-    obj["hello"] = "h3110";
+    _object["hello"] = "h3110";
 
-    REQUIRE(true == obj["hello"].is<const char*>());
-    REQUIRE(false == obj["hello"].is<long>());
-    REQUIRE(std::string("h3110") == obj["hello"].as<const char*>());
-    REQUIRE(std::string("h3110") == obj["hello"].as<char*>());  // <- short hand
+    REQUIRE(true == _object["hello"].is<const char*>());
+    REQUIRE(false == _object["hello"].is<long>());
+    REQUIRE(std::string("h3110") == _object["hello"].as<const char*>());
+    REQUIRE(std::string("h3110") ==
+            _object["hello"].as<char*>());  // <- short hand
   }
 
   SECTION("array") {
-    DynamicJsonDocument doc2;
-    JsonArray arr = doc2.to<JsonArray>();
+    JsonArray& arr = _jsonBuffer.createArray();
 
-    obj["hello"] = arr;
+    _object["hello"] = arr;
 
-    REQUIRE(arr == obj["hello"].as<JsonArray>());
-    REQUIRE(arr == obj["hello"].as<JsonArray>());  // <- short hand
-    // REQUIRE(arr == obj["hello"].as<const JsonArray>());
-    // REQUIRE(arr == obj["hello"].as<const JsonArray>());  // <- short hand
-    REQUIRE(true == obj["hello"].is<JsonArray>());
-    REQUIRE(true == obj["hello"].is<JsonArray>());
-    REQUIRE(true == obj["hello"].is<const JsonArray>());
-    REQUIRE(true == obj["hello"].is<const JsonArray>());
-    REQUIRE(false == obj["hello"].is<JsonObject>());
+    REQUIRE(&arr == &_object["hello"].as<JsonArray&>());
+    REQUIRE(&arr == &_object["hello"].as<JsonArray>());  // <- short hand
+    REQUIRE(&arr == &_object["hello"].as<const JsonArray&>());
+    REQUIRE(&arr == &_object["hello"].as<const JsonArray>());  // <- short hand
+    REQUIRE(true == _object["hello"].is<JsonArray&>());
+    REQUIRE(true == _object["hello"].is<JsonArray>());
+    REQUIRE(true == _object["hello"].is<const JsonArray&>());
+    REQUIRE(true == _object["hello"].is<const JsonArray>());
+    REQUIRE(false == _object["hello"].is<JsonObject&>());
   }
 
   SECTION("object") {
-    DynamicJsonDocument doc2;
-    JsonObject obj2 = doc2.to<JsonObject>();
+    JsonObject& obj = _jsonBuffer.createObject();
 
-    obj["hello"] = obj2;
+    _object["hello"] = obj;
 
-    REQUIRE(obj2 == obj["hello"].as<JsonObject>());
-    REQUIRE(obj2 == obj["hello"].as<const JsonObject>());
-    REQUIRE(true == obj["hello"].is<JsonObject>());
-    REQUIRE(true == obj["hello"].is<const JsonObject>());
-    REQUIRE(false == obj["hello"].is<JsonArray>());
+    REQUIRE(&obj == &_object["hello"].as<JsonObject&>());
+    REQUIRE(&obj == &_object["hello"].as<JsonObject>());  // <- short hand
+    REQUIRE(&obj == &_object["hello"].as<const JsonObject&>());
+    REQUIRE(&obj == &_object["hello"].as<const JsonObject>());  // <- short hand
+    REQUIRE(true == _object["hello"].is<JsonObject&>());
+    REQUIRE(true == _object["hello"].is<JsonObject>());
+    REQUIRE(true == _object["hello"].is<const JsonObject&>());
+    REQUIRE(true == _object["hello"].is<const JsonObject>());
+    REQUIRE(false == _object["hello"].is<JsonArray&>());
   }
 
   SECTION("array subscript") {
-    DynamicJsonDocument doc2;
-    JsonArray arr = doc2.to<JsonArray>();
+    JsonArray& arr = _jsonBuffer.createArray();
     arr.add(42);
 
-    obj["a"] = arr[0];
+    _object["a"] = arr[0];
 
-    REQUIRE(42 == obj["a"]);
+    REQUIRE(42 == _object["a"]);
   }
 
   SECTION("object subscript") {
-    DynamicJsonDocument doc2;
-    JsonObject obj2 = doc2.to<JsonObject>();
-    obj2.set("x", 42);
+    JsonObject& obj = _jsonBuffer.createObject();
+    obj.set("x", 42);
 
-    obj["a"] = obj2["x"];
+    _object["a"] = obj["x"];
 
-    REQUIRE(42 == obj["a"]);
+    REQUIRE(42 == _object["a"]);
   }
 
   SECTION("char key[]") {  // issue #423
     char key[] = "hello";
-    obj[key] = 42;
-    REQUIRE(42 == obj[key]);
+    _object[key] = 42;
+    REQUIRE(42 == _object[key]);
   }
 
   SECTION("should not duplicate const char*") {
-    obj["hello"] = "world";
+    _object["hello"] = "world";
     const size_t expectedSize = JSON_OBJECT_SIZE(1);
-    REQUIRE(expectedSize == doc.memoryUsage());
+    REQUIRE(expectedSize == _jsonBuffer.size());
   }
 
   SECTION("should duplicate char* value") {
-    obj["hello"] = const_cast<char*>("world");
+    _object["hello"] = const_cast<char*>("world");
     const size_t expectedSize = JSON_OBJECT_SIZE(1) + 6;
-    REQUIRE(expectedSize == doc.memoryUsage());
+    REQUIRE(expectedSize == _jsonBuffer.size());
   }
 
   SECTION("should duplicate char* key") {
-    obj[const_cast<char*>("hello")] = "world";
+    _object[const_cast<char*>("hello")] = "world";
     const size_t expectedSize = JSON_OBJECT_SIZE(1) + 6;
-    REQUIRE(expectedSize == doc.memoryUsage());
+    REQUIRE(expectedSize == _jsonBuffer.size());
   }
 
   SECTION("should duplicate char* key&value") {
-    obj[const_cast<char*>("hello")] = const_cast<char*>("world");
+    _object[const_cast<char*>("hello")] = const_cast<char*>("world");
     const size_t expectedSize = JSON_OBJECT_SIZE(1) + 12;
-    REQUIRE(expectedSize <= doc.memoryUsage());
+    REQUIRE(expectedSize <= _jsonBuffer.size());
   }
 
   SECTION("should duplicate std::string value") {
-    obj["hello"] = std::string("world");
+    _object["hello"] = std::string("world");
     const size_t expectedSize = JSON_OBJECT_SIZE(1) + 6;
-    REQUIRE(expectedSize == doc.memoryUsage());
+    REQUIRE(expectedSize == _jsonBuffer.size());
   }
 
   SECTION("should duplicate std::string key") {
-    obj[std::string("hello")] = "world";
+    _object[std::string("hello")] = "world";
     const size_t expectedSize = JSON_OBJECT_SIZE(1) + 6;
-    REQUIRE(expectedSize == doc.memoryUsage());
+    REQUIRE(expectedSize == _jsonBuffer.size());
   }
 
   SECTION("should duplicate std::string key&value") {
-    obj[std::string("hello")] = std::string("world");
+    _object[std::string("hello")] = std::string("world");
     const size_t expectedSize = JSON_OBJECT_SIZE(1) + 12;
-    REQUIRE(expectedSize <= doc.memoryUsage());
+    REQUIRE(expectedSize <= _jsonBuffer.size());
   }
 
   SECTION("should ignore null key") {
     // object must have a value to make a call to strcmp()
-    obj["dummy"] = 42;
+    _object["dummy"] = 42;
 
     const char* null = 0;
-    obj[null] = 666;
+    _object[null] = 666;
 
-    REQUIRE(obj.size() == 1);
-    REQUIRE(obj[null] == 0);
+    REQUIRE(_object.size() == 1);
+    REQUIRE(_object[null] == 0);
   }
-
-#if defined(HAS_VARIABLE_LENGTH_ARRAY) && \
-    !defined(SUBSCRIPT_CONFLICTS_WITH_BUILTIN_OPERATOR)
-  SECTION("obj[VLA] = str") {
-    int i = 16;
-    char vla[i];
-    strcpy(vla, "hello");
-
-    obj[vla] = "world";
-
-    REQUIRE(std::string("world") == obj["hello"]);
-  }
-
-  SECTION("obj[str] = VLA") {  // issue #416
-    int i = 32;
-    char vla[i];
-    strcpy(vla, "world");
-
-    obj["hello"] = vla;
-
-    REQUIRE(std::string("world") == obj["hello"].as<char*>());
-  }
-
-  SECTION("obj.set(VLA, str)") {
-    int i = 16;
-    char vla[i];
-    strcpy(vla, "hello");
-
-    obj[vla] = "world";
-
-    REQUIRE(std::string("world") == obj["hello"]);
-  }
-
-  SECTION("obj.set(str, VLA)") {
-    int i = 32;
-    char vla[i];
-    strcpy(vla, "world");
-
-    obj["hello"].set(vla);
-
-    REQUIRE(std::string("world") == obj["hello"].as<char*>());
-  }
-
-  SECTION("obj[VLA]") {
-    int i = 16;
-    char vla[i];
-    strcpy(vla, "hello");
-
-    deserializeJson(doc, "{\"hello\":\"world\"}");
-
-    obj = doc.as<JsonObject>();
-    REQUIRE(std::string("world") == obj[vla]);
-  }
-#endif
 }

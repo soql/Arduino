@@ -1,5 +1,5 @@
 // ArduinoJson - arduinojson.org
-// Copyright Benoit Blanchon 2014-2018
+// Copyright Benoit Blanchon 2014-2019
 // MIT License
 //
 // This example shows how to send a JSON document to a UDP socket.
@@ -43,15 +43,15 @@ void setup() {
 }
 
 void loop() {
-  // Allocate the JSON document
+  // Allocate JsonBuffer
   // Use arduinojson.org/assistant to compute the capacity.
-  StaticJsonDocument<500> doc;
+  StaticJsonBuffer<500> jsonBuffer;
 
-  // Make our document represent an object
-  JsonObject root = doc.to<JsonObject>();
+  // Create the root object
+  JsonObject& root = jsonBuffer.createObject();
 
   // Create the "analog" array
-  JsonArray analogValues = root.createNestedArray("analog");
+  JsonArray& analogValues = root.createNestedArray("analog");
   for (int pin = 0; pin < 6; pin++) {
     // Read the analog input
     int value = analogRead(pin);
@@ -61,7 +61,7 @@ void loop() {
   }
 
   // Create the "digital" array
-  JsonArray digitalValues = root.createNestedArray("digital");
+  JsonArray& digitalValues = root.createNestedArray("digital");
   for (int pin = 0; pin < 14; pin++) {
     // Read the digital input
     int value = digitalRead(pin);
@@ -75,11 +75,11 @@ void loop() {
   Serial.print(remoteIp);
   Serial.print(F(" on port "));
   Serial.println(remotePort);
-  serializeJson(root, Serial);
+  root.printTo(Serial);
 
   // Send UDP packet
   udp.beginPacket(remoteIp, remotePort);
-  serializeJson(root, udp);
+  root.printTo(udp);
   udp.println();
   udp.endPacket();
 
@@ -87,4 +87,15 @@ void loop() {
   delay(10000);
 }
 
-// Visit https://arduinojson.org/v6/example/udp-beacon/ for more.
+// See also
+// --------
+//
+// https://arduinojson.org/ contains the documentation for all the functions
+// used above. It also includes an FAQ that will help you solve any
+// serialization problem.
+//
+// The book "Mastering ArduinoJson" contains a tutorial on serialization.
+// It begins with a simple example, then adds more features like serializing
+// directly to a file or any stream.
+// Learn more at https://arduinojson.org/book/
+// Use the coupon code TWENTY for a 20% discount ❤❤❤❤❤

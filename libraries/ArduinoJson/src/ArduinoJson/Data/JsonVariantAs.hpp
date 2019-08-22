@@ -1,5 +1,5 @@
 // ArduinoJson - arduinojson.org
-// Copyright Benoit Blanchon 2014-2018
+// Copyright Benoit Blanchon 2014-2019
 // MIT License
 
 #pragma once
@@ -19,5 +19,24 @@ struct JsonVariantAs<char*> {
   typedef const char* type;
 };
 
+template <>
+struct JsonVariantAs<JsonArray> {
+  typedef JsonArray& type;
+};
+
+template <>
+struct JsonVariantAs<const JsonArray> {
+  typedef const JsonArray& type;
+};
+
+template <>
+struct JsonVariantAs<JsonObject> {
+  typedef JsonObject& type;
+};
+
+template <>
+struct JsonVariantAs<const JsonObject> {
+  typedef const JsonObject& type;
+};
 }  // namespace Internals
 }  // namespace ArduinoJson

@@ -1,21 +1,20 @@
-#define TINY_GSM_MODEM_A6
-
+#define TINY_GSM_MODEM_SIM800
+#include <TinyGPS++.h>
 #include <TinyGsmClient.h>
 #include <PubSubClient.h>
-#include <TinyGPS.h>
+#include <Arduino.h>
 
-#define SerialAT Serial
+TinyGPSPlus gps;
 
-#include <SoftwareSerial.h>
+#define SerialAT Serial2
+#define DUMP_SERIAL
 #ifdef DUMP_SERIAL
-SoftwareSerial SerialMon(4, 3); // RX, TX
+#define SerialMon Serial
 #endif
-//#define DUMP_AT_COMMANDS
- TinyGPS gps;
  
-const char apn[]  = "Internet";
-const char user[] = "Internet";
-const char pass[] = "Internet";
+const char apn[]  = "internet";
+const char user[] = "";
+const char pass[] = "";
 
 // MQTT details
 const char* broker = "oth.net.pl";
@@ -23,6 +22,7 @@ const char* broker = "oth.net.pl";
 const char* topic = "telemetry/bus/localization";
 
 #define DUMP_AT_COMMANDS
+#define ss Serial3
 /*#define TINY_GSM_DEBUG SerialMon
 
 
@@ -40,25 +40,32 @@ PubSubClient mqtt(client);
 
 long lastReconnectAttempt = 0;
 
-void(* resetFunc) (void) = 0;//declare reset function at address 0
+void resetFunc(){
+   #ifdef DUMP_SERIAL
+  SerialMon.println("RESET");
+   #endif     
+  pinMode(PB6, OUTPUT);
+  digitalWrite(PB6, LOW);
+  delay(2000);
+  digitalWrite(PB6, HIGH);
+  setup();
+}
 
-static void smartdelay(unsigned long ms, SoftwareSerial* gpsserial, TinyGPS* gps)
+static void smartDelay(unsigned long ms)
 {
   unsigned long start = millis();
   do 
   {
-    while (gpsserial->available())
-      gps->encode(gpsserial->read());
+    while (ss.available())
+      gps.encode(ss.read());
   } while (millis() - start < ms);
 }
 
-
-
 String getGPSData(){   
-//  SerialMon.println("Start GPS data...");
-  SoftwareSerial gpsserial(5, 6);
-  gpsserial.begin(9600);  
-  delay(1000);  
+ #ifdef DUMP_SERIAL 
+  SerialMon.println("Start GPS data..."); 
+   #endif
+  ss.begin(9600);    
   boolean ok=true;
   float flat, flon, speed;
   unsigned long age, date, time, chars = 0;  
@@ -67,66 +74,111 @@ String getGPSData(){
   byte month, day, hour, minute, second;
   
   int i=0;
+  ok=true;
   do {
-    i++;
+    i++; 
+       
     ok=true;
-    gps.f_get_position(&flat, &flon, &age);  
+    smartDelay(0);
+   flat=gps.location.lat();
     
-    if(flat!=TinyGPS::GPS_INVALID_F_ANGLE){            
-    }else{
-  //    SerialMon.println("NOT OK");
-      ok=false;
-    }
-    smartdelay(0, &gpsserial, &gps);
-    if(flon!=TinyGPS::GPS_INVALID_F_ANGLE){     
-    }else{
-    //  SerialMon.println("NOT OK");
-      ok=false;
-    }
-    smartdelay(0, &gpsserial, &gps);
-    speed=gps.f_speed_kmph();
-    if(speed!=TinyGPS::GPS_INVALID_F_SPEED){    
+    if(gps.location.isValid()){            
     }else{
       #ifdef DUMP_SERIAL
       SerialMon.println("NOT OK");
       #endif
       ok=false;
     }
-    smartdelay(0, &gpsserial, &gps);
-    gps.crack_datetime(&year, &month, &day, &hour, &minute, &second, NULL, &age);
-    if(age!=TinyGPS::GPS_INVALID_AGE){     
+    smartDelay(0);
+    flon=gps.location.lng();
+    if(gps.location.isValid()){     
     }else{
       #ifdef DUMP_SERIAL
       SerialMon.println("NOT OK");
       #endif
       ok=false;
     }
-    smartdelay(0, &gpsserial, &gps);
-    smartdelay(1000, &gpsserial, &gps);
-  }while(ok!=true && i<10);    
-
-  String payload = "{";
-  payload += "\"latitude\":"; payload += String(flat,6); payload += ",";
-  payload += "\"longitude\":"; payload += String(flon,6);payload += ",";
-  payload += "\"time\":\""; payload += String(year)+"-"+String(month)+"-"+String(day)+" "+String(hour)+":"+String(minute)+":"+String(second);
-  payload += "\",";
-  payload += "\"speed\":"; payload += speed;
-  payload += "}";
-  
-  //SerialMon.println(payload);
+    smartDelay(0);
+    
+    speed=gps.speed.kmph();
+    
+    if( gps.speed.isValid()){    
+    }else{
+      #ifdef DUMP_SERIAL
+      SerialMon.println("NOT OK");
+      #endif
+      ok=false;
+    }
+    smartDelay(0);
+    TinyGPSDate d=gps.date;
+     if(d.isValid()){  
+       year=d.year();
+       month=d.month();
+       day=d.day();
+    }else{
+      #ifdef DUMP_SERIAL
+      SerialMon.println("NOT OK");
+      #endif;
+      ok=false;
+    }
+    smartDelay(0);
+ TinyGPSTime t=gps.time;
+     if(t.isValid()){  
+       hour=t.hour();
+       minute=t.minute();
+       second=t.second();
+    }else{
+      #ifdef DUMP_SERIAL
+      SerialMon.println("NOT OK");
+      #endif
+      ok=false;
+    }
+  #ifdef DUMP_SERIAL
+      SerialMon.println("KONIEC");
+      SerialMon.flush();
+      #endif
+    smartDelay(0);
+    smartDelay(1000);    
+    if(ok)
+      break;
+      
+  }while(ok!=true && i<120);     
+ char sz[32];
+    sprintf(sz, "%04d-%02d-%02d", year, month,day);
+    char sz2[32];
+    sprintf(sz2, "%02d:%02d:%02d", hour, minute,second);
+  String payload;
+  if(ok){
+      payload = "{";
+      payload += "\"latitude\":"; payload += String(flat,6); payload += ",";
+      payload += "\"longitude\":"; payload += String(flon,6);payload += ",";
+      payload += "\"time\":\""; payload += String(sz)+" "+String(sz2);
+      payload += "\",";
+      payload += "\"speed\":"; payload += speed;
+      payload += "}";
+  }else{
+      payload += "{\"keepalive\":"; payload += "true\"}";
+  }
+#ifdef DUMP_SERIAL  
+  SerialMon.println(payload);
+  #endif
+  ss.end();
   return payload;
 }
 String payload;
-void setup() {
+int attemptMqtt=0;
+void setup() {  
+  attemptMqtt=0;
   lastReconnectAttempt=0;
   //
   #ifdef DUMP_SERIAL
   SerialMon.begin(57600);
+  SerialMon.println("Hello...");
   #endif       
-  delay(5000);
-  SerialAT.begin(57600);
-  //TinyGsmAutoBaud(SerialAT);
-  payload=getGPSData();      
+ // delay(5000);
+  //SerialAT.begin(57600);
+  payload=getGPSData();   
+  TinyGsmAutoBaud(SerialAT);      
 #ifdef DUMP_SERIAL  
   SerialMon.println("Initializing modem...");
   #endif
@@ -174,10 +226,15 @@ void setup() {
   SerialMon.print("Connecting to ");
   SerialMon.print(apn);
   #endif
-  if (!modem.gprsConnect(apn, user, pass)) {
-   // SerialMon.println(" fail");    
-    delay(5000);
-    resetFunc();
+  int att=0;
+  while(!modem.gprsConnect(apn, user, pass)) {
+    #ifdef DUMP_SERIAL
+    SerialMon.println(" fail");  
+      #endif
+          att++;
+          if(att>10){
+            resetFunc();
+          }
   }
   #ifdef DUMP_SERIAL
   SerialMon.println(" OK");  
@@ -199,8 +256,7 @@ boolean mqttConnect() {
   if (status == false) {    
     #ifdef DUMP_SERIAL
     SerialMon.println("MQTT NIE OK");      
-    #endif
-    delay(1000);        
+    #endif    
     return false;
   }
   #ifdef DUMP_SERIAL
@@ -210,46 +266,31 @@ boolean mqttConnect() {
 }
 
 void loop() {
-  boolean con=false;
-  int m=0;
-   do{
+  if (!mqtt.connected()) {
     #ifdef DUMP_SERIAL
     SerialMon.println("=== MQTT NOT CONNECTED ===");
-    #endif
-    // Reconnect every 10 seconds   
-      unsigned long t = millis();
-      if (t - lastReconnectAttempt > 10000L) {
-        lastReconnectAttempt = t;
-        con=mqttConnect();
-        m++;
-        if(m>=5){
-          client.stop();
-          #ifdef DUMP_SERIAL
-          SerialAT.println("AT+CIPCLOSE");
-          #endif
-          delay(1000);
+     #endif
+    // Reconnect every 10 seconds
+    unsigned long t = millis();
+    if (t - lastReconnectAttempt > 10000L) {
+      lastReconnectAttempt = t;
+      if (mqttConnect()) {
+        lastReconnectAttempt = 0;
+         attemptMqtt=0;        
+      }else{
+        attemptMqtt++;
+        if(attemptMqtt>3)
           resetFunc();
-          break;
-        }
-        if (con) {
-          lastReconnectAttempt = 0;
-        }
       }
-    }while(!con);
-    //payload=getGPSData();      
-    char attributes[256];
-    payload.toCharArray( attributes, 256 );
-
-    mqtt.publish(topic,attributes);    
-    delay(1000);
-    
-    mqtt.disconnect();    
-    client.stop();          
-//    client.stopAll();          
-    client.flush();
-    
-    delay(1000);
-    resetFunc();
+    }
+    delay(100);
+    return;
   }
-  
 
+  mqtt.loop();  
+  char attributes[256];
+  payload.toCharArray( attributes, 256 );
+  mqtt.publish(topic,attributes);    
+  delay(3000);   
+  payload=getGPSData();     
+}

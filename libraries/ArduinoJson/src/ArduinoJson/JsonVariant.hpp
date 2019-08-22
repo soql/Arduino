@@ -1,5 +1,5 @@
 // ArduinoJson - arduinojson.org
-// Copyright Benoit Blanchon 2014-2018
+// Copyright Benoit Blanchon 2014-2019
 // MIT License
 
 #pragma once
@@ -7,13 +7,21 @@
 #include <stddef.h>
 #include <stdint.h>  // for uint8_t
 
-#include "Data/JsonVariantData.hpp"
-#include "JsonVariant.hpp"
+#include "Data/JsonVariantContent.hpp"
+#include "Data/JsonVariantDefault.hpp"
+#include "Data/JsonVariantType.hpp"
 #include "JsonVariantBase.hpp"
-#include "Memory/JsonBuffer.hpp"
-#include "Polyfills/type_traits.hpp"
-#include "Serialization/DynamicStringWriter.hpp"
-#include "SerializedValue.hpp"
+#include "RawJson.hpp"
+#include "Serialization/JsonPrintable.hpp"
+#include "TypeTraits/EnableIf.hpp"
+#include "TypeTraits/IsChar.hpp"
+#include "TypeTraits/IsFloatingPoint.hpp"
+#include "TypeTraits/IsIntegral.hpp"
+#include "TypeTraits/IsSame.hpp"
+#include "TypeTraits/IsSignedIntegral.hpp"
+#include "TypeTraits/IsUnsignedIntegral.hpp"
+#include "TypeTraits/RemoveConst.hpp"
+#include "TypeTraits/RemoveReference.hpp"
 
 namespace ArduinoJson {
 
@@ -29,147 +37,102 @@ class JsonObject;
 // - a string (const char*)
 // - a reference to a JsonArray or JsonObject
 class JsonVariant : public Internals::JsonVariantBase<JsonVariant> {
+  template <typename Print>
+  friend class Internals::JsonSerializer;
+
  public:
-  // Intenal use only
-  FORCE_INLINE JsonVariant(Internals::JsonBuffer *buffer,
-                           Internals::JsonVariantData *data)
-      : _buffer(buffer), _data(data) {}
-
   // Creates an uninitialized JsonVariant
-  FORCE_INLINE JsonVariant() : _buffer(0), _data(0) {}
+  JsonVariant() : _type(Internals::JSON_UNDEFINED) {}
 
-  // set(bool value)
-  FORCE_INLINE bool set(bool value) {
-    if (!_data) return false;
-    _data->setBoolean(value);
-    return true;
+  // Create a JsonVariant containing a boolean value.
+  // It will be serialized as "true" or "false" in JSON.
+  JsonVariant(bool value) {
+    using namespace Internals;
+    _type = JSON_BOOLEAN;
+    _content.asInteger = static_cast<JsonUInt>(value);
   }
 
-  // set(double value);
-  // set(float value);
+  // Create a JsonVariant containing a floating point value.
+  // JsonVariant(double value);
+  // JsonVariant(float value);
   template <typename T>
-  FORCE_INLINE bool set(
-      T value, typename Internals::enable_if<
-                   Internals::is_floating_point<T>::value>::type * = 0) {
-    if (!_data) return false;
-    _data->setFloat(static_cast<Internals::JsonFloat>(value));
-    return true;
+  JsonVariant(T value, typename Internals::EnableIf<
+                           Internals::IsFloatingPoint<T>::value>::type * = 0) {
+    using namespace Internals;
+    _type = JSON_FLOAT;
+    _content.asFloat = static_cast<JsonFloat>(value);
+  }
+  template <typename T>
+  DEPRECATED("Second argument is not supported anymore")
+  JsonVariant(T value, uint8_t,
+              typename Internals::EnableIf<
+                  Internals::IsFloatingPoint<T>::value>::type * = 0) {
+    using namespace Internals;
+    _type = JSON_FLOAT;
+    _content.asFloat = static_cast<JsonFloat>(value);
   }
 
-  // set(char)
-  // set(signed short)
-  // set(signed int)
-  // set(signed long)
-  // set(signed char)
+  // Create a JsonVariant containing an integer value.
+  // JsonVariant(char)
+  // JsonVariant(signed short)
+  // JsonVariant(signed int)
+  // JsonVariant(signed long)
+  // JsonVariant(signed char)
   template <typename T>
-  FORCE_INLINE bool set(
+  JsonVariant(
       T value,
-      typename Internals::enable_if<Internals::is_integral<T>::value &&
-                                    Internals::is_signed<T>::value>::type * =
+      typename Internals::EnableIf<Internals::IsSignedIntegral<T>::value ||
+                                   Internals::IsSame<T, char>::value>::type * =
           0) {
-    if (!_data) return false;
-    if (value >= 0)
-      _data->setPostiveInteger(static_cast<Internals::JsonUInt>(value));
-    else
-      _data->setNegativeInteger(~static_cast<Internals::JsonUInt>(value) + 1);
-    return true;
-  }
-
-  // set(unsigned short)
-  // set(unsigned int)
-  // set(unsigned long)
-  template <typename T>
-  FORCE_INLINE bool set(
-      T value,
-      typename Internals::enable_if<Internals::is_integral<T>::value &&
-                                    Internals::is_unsigned<T>::value>::type * =
-          0) {
-    if (!_data) return false;
-    _data->setPostiveInteger(static_cast<Internals::JsonUInt>(value));
-    return true;
-  }
-
-  // set(SerializedValue<const char *>)
-  FORCE_INLINE bool set(Internals::SerializedValue<const char *> value) {
-    if (!_data) return false;
-    _data->setRaw(value.data(), value.size());
-    return true;
-  }
-
-  // set(SerializedValue<std::string>)
-  // set(SerializedValue<String>)
-  // set(SerializedValue<const __FlashStringHelper*>)
-  template <typename T>
-  FORCE_INLINE bool set(
-      Internals::SerializedValue<T> value,
-      typename Internals::enable_if<
-          !Internals::is_same<const char *, T>::value>::type * = 0) {
-    if (!_data) return false;
-    const char *dup =
-        Internals::makeString(value.data(), value.size()).save(_buffer);
-    if (dup)
-      _data->setRaw(dup, value.size());
-    else
-      _data->setNull();
-    return true;
-  }
-
-  // set(const std::string&)
-  // set(const String&)
-  template <typename T>
-  FORCE_INLINE bool set(
-      const T &value,
-      typename Internals::enable_if<Internals::IsString<T>::value>::type * =
-          0) {
-    if (!_data) return false;
-    const char *dup = Internals::makeString(value).save(_buffer);
-    if (dup) {
-      _data->setString(dup);
-      return true;
+    using namespace Internals;
+    if (value >= 0) {
+      _type = JSON_POSITIVE_INTEGER;
+      _content.asInteger = static_cast<JsonUInt>(value);
     } else {
-      _data->setNull();
-      return false;
+      _type = JSON_NEGATIVE_INTEGER;
+      _content.asInteger = static_cast<JsonUInt>(-value);
     }
   }
-
-  // set(char*)
+  // JsonVariant(unsigned short)
+  // JsonVariant(unsigned int)
+  // JsonVariant(unsigned long)
   template <typename T>
-  FORCE_INLINE bool set(
-      T *value,
-      typename Internals::enable_if<Internals::IsString<T *>::value>::type * =
+  JsonVariant(T value,
+              typename Internals::EnableIf<
+                  Internals::IsUnsignedIntegral<T>::value>::type * = 0) {
+    using namespace Internals;
+    _type = JSON_POSITIVE_INTEGER;
+    _content.asInteger = static_cast<JsonUInt>(value);
+  }
+
+  // Create a JsonVariant containing a string.
+  // JsonVariant(const char*);
+  // JsonVariant(const signed char*);
+  // JsonVariant(const unsigned char*);
+  template <typename TChar>
+  JsonVariant(
+      const TChar *value,
+      typename Internals::EnableIf<Internals::IsChar<TChar>::value>::type * =
           0) {
-    if (!_data) return false;
-    const char *dup = Internals::makeString(value).save(_buffer);
-    if (dup) {
-      _data->setString(dup);
-      return true;
-    } else {
-      _data->setNull();
-      return false;
-    }
+    _type = Internals::JSON_STRING;
+    _content.asString = reinterpret_cast<const char *>(value);
   }
 
-  // set(const char*);
-  FORCE_INLINE bool set(const char *value) {
-    if (!_data) return false;
-    _data->setString(value);
-    return true;
+  // Create a JsonVariant containing an unparsed string
+  JsonVariant(Internals::RawJsonString<const char *> value) {
+    _type = Internals::JSON_UNPARSED;
+    _content.asString = value;
   }
 
-  FORCE_INLINE bool set(const JsonVariant &value) {
-    if (!_data) return false;
-    if (value._data)
-      *_data = *value._data;
-    else
-      _data->setNull();
-    return true;
-  }
+  // Create a JsonVariant containing a reference to an array.
+  // CAUTION: we are lying about constness, because the array can be modified if
+  // the variant is converted back to a JsonArray&
+  JsonVariant(const JsonArray &array);
 
-  FORCE_INLINE bool set(const JsonArray &array);
-  FORCE_INLINE bool set(const Internals::JsonArraySubscript &);
-  FORCE_INLINE bool set(const JsonObject &object);
-  template <typename TString>
-  FORCE_INLINE bool set(const Internals::JsonObjectSubscript<TString> &);
+  // Create a JsonVariant containing a reference to an object.
+  // CAUTION: we are lying about constness, because the object can be modified
+  // if the variant is converted back to a JsonObject&
+  JsonVariant(const JsonObject &object);
 
   // Get the variant as the specified type.
   //
@@ -183,77 +146,96 @@ class JsonVariant : public Internals::JsonVariantBase<JsonVariant> {
   // unsigned int as<unsigned int>() const;
   // unsigned long as<unsigned long>() const;
   template <typename T>
-  FORCE_INLINE const typename Internals::enable_if<
-      Internals::is_integral<T>::value, T>::type
+  const typename Internals::EnableIf<Internals::IsIntegral<T>::value, T>::type
   as() const {
-    return _data ? _data->asInteger<T>() : T();
+    return variantAsInteger<T>();
   }
   // bool as<bool>() const
   template <typename T>
-  FORCE_INLINE const typename Internals::enable_if<
-      Internals::is_same<T, bool>::value, T>::type
+  const typename Internals::EnableIf<Internals::IsSame<T, bool>::value, T>::type
   as() const {
-    return _data && _data->asInteger<int>() != 0;
+    return variantAsInteger<int>() != 0;
   }
   //
   // double as<double>() const;
   // float as<float>() const;
   template <typename T>
-  FORCE_INLINE const typename Internals::enable_if<
-      Internals::is_floating_point<T>::value, T>::type
+  const typename Internals::EnableIf<Internals::IsFloatingPoint<T>::value,
+                                     T>::type
   as() const {
-    return _data ? _data->asFloat<T>() : 0;
+    return variantAsFloat<T>();
   }
   //
   // const char* as<const char*>() const;
   // const char* as<char*>() const;
   template <typename T>
-  FORCE_INLINE typename Internals::enable_if<
-      Internals::is_same<T, const char *>::value ||
-          Internals::is_same<T, char *>::value,
-      const char *>::type
+  typename Internals::EnableIf<Internals::IsSame<T, const char *>::value ||
+                                   Internals::IsSame<T, char *>::value,
+                               const char *>::type
   as() const {
-    return _data ? _data->asString() : 0;
+    return variantAsString();
   }
   //
   // std::string as<std::string>() const;
   // String as<String>() const;
   template <typename T>
-  FORCE_INLINE
-      typename Internals::enable_if<Internals::IsWriteableString<T>::value,
-                                    T>::type
-      as() const {
-    const char *cstr = _data ? _data->asString() : 0;
+  typename Internals::EnableIf<Internals::StringTraits<T>::has_append, T>::type
+  as() const {
+    const char *cstr = variantAsString();
     if (cstr) return T(cstr);
     T s;
-    serializeJson(*this, s);
+    printTo(s);
     return s;
   }
   //
-  // JsonArray as<JsonArray>() const;
-  // const JsonArray as<const JsonArray>() const;
+  // JsonArray& as<JsonArray> const;
+  // JsonArray& as<JsonArray&> const;
   template <typename T>
-  FORCE_INLINE typename Internals::enable_if<
-      Internals::is_same<typename Internals::remove_const<T>::type,
-                         JsonArray>::value,
-      JsonArray>::type
-  as() const;
+  typename Internals::EnableIf<
+      Internals::IsSame<typename Internals::RemoveReference<T>::type,
+                        JsonArray>::value,
+      JsonArray &>::type
+  as() const {
+    return variantAsArray();
+  }
   //
-  // JsonObject as<JsonObject>() const;
-  // const JsonObject as<const JsonObject>() const;
+  // const JsonArray& as<const JsonArray&> const;
   template <typename T>
-  FORCE_INLINE typename Internals::enable_if<
-      Internals::is_same<typename Internals::remove_const<T>::type,
-                         JsonObject>::value,
-      T>::type
-  as() const;
+  typename Internals::EnableIf<
+      Internals::IsSame<typename Internals::RemoveReference<T>::type,
+                        const JsonArray>::value,
+      const JsonArray &>::type
+  as() const {
+    return variantAsArray();
+  }
+  //
+  // JsonObject& as<JsonObject> const;
+  // JsonObject& as<JsonObject&> const;
+  template <typename T>
+  typename Internals::EnableIf<
+      Internals::IsSame<typename Internals::RemoveReference<T>::type,
+                        JsonObject>::value,
+      JsonObject &>::type
+  as() const {
+    return variantAsObject();
+  }
+  //
+  // JsonObject& as<const JsonObject> const;
+  // JsonObject& as<const JsonObject&> const;
+  template <typename T>
+  typename Internals::EnableIf<
+      Internals::IsSame<typename Internals::RemoveReference<T>::type,
+                        const JsonObject>::value,
+      const JsonObject &>::type
+  as() const {
+    return variantAsObject();
+  }
   //
   // JsonVariant as<JsonVariant> const;
   template <typename T>
-  FORCE_INLINE
-      typename Internals::enable_if<Internals::is_same<T, JsonVariant>::value,
-                                    T>::type
-      as() const {
+  typename Internals::EnableIf<Internals::IsSame<T, JsonVariant>::value,
+                               T>::type
+  as() const {
     return *this;
   }
 
@@ -270,78 +252,106 @@ class JsonVariant : public Internals::JsonVariantBase<JsonVariant> {
   // bool is<unsigned int>() const;
   // bool is<unsigned long>() const;
   template <typename T>
-  FORCE_INLINE typename Internals::enable_if<Internals::is_integral<T>::value,
-                                             bool>::type
-  is() const {
-    return _data && _data->isInteger();
+  typename Internals::EnableIf<Internals::IsIntegral<T>::value, bool>::type is()
+      const {
+    return variantIsInteger();
   }
   //
   // bool is<double>() const;
   // bool is<float>() const;
   template <typename T>
-  FORCE_INLINE
-      typename Internals::enable_if<Internals::is_floating_point<T>::value,
-                                    bool>::type
-      is() const {
-    return _data && _data->isFloat();
+  typename Internals::EnableIf<Internals::IsFloatingPoint<T>::value, bool>::type
+  is() const {
+    return variantIsFloat();
   }
   //
   // bool is<bool>() const
   template <typename T>
-  FORCE_INLINE typename Internals::enable_if<Internals::is_same<T, bool>::value,
-                                             bool>::type
+  typename Internals::EnableIf<Internals::IsSame<T, bool>::value, bool>::type
   is() const {
-    return _data && _data->isBoolean();
+    return variantIsBoolean();
   }
   //
   // bool is<const char*>() const;
   // bool is<char*>() const;
+  // bool is<std::string>() const;
   template <typename T>
-  FORCE_INLINE typename Internals::enable_if<
-      Internals::is_same<T, const char *>::value ||
-          Internals::is_same<T, char *>::value,
-      bool>::type
+  typename Internals::EnableIf<Internals::IsSame<T, const char *>::value ||
+                                   Internals::IsSame<T, char *>::value ||
+                                   Internals::StringTraits<T>::has_append,
+                               bool>::type
   is() const {
-    return _data && _data->isString();
+    return variantIsString();
   }
   //
   // bool is<JsonArray> const;
-  // bool is<const JsonArray> const;
+  // bool is<JsonArray&> const;
+  // bool is<const JsonArray&> const;
   template <typename T>
-  FORCE_INLINE typename Internals::enable_if<
-      Internals::is_same<typename Internals::remove_const<T>::type,
-                         JsonArray>::value,
+  typename Internals::EnableIf<
+      Internals::IsSame<typename Internals::RemoveConst<
+                            typename Internals::RemoveReference<T>::type>::type,
+                        JsonArray>::value,
       bool>::type
   is() const {
-    return _data && _data->isArray();
+    return variantIsArray();
   }
   //
   // bool is<JsonObject> const;
-  // bool is<const JsonObject> const;
+  // bool is<JsonObject&> const;
+  // bool is<const JsonObject&> const;
   template <typename T>
-  FORCE_INLINE typename Internals::enable_if<
-      Internals::is_same<typename Internals::remove_const<T>::type,
-                         JsonObject>::value,
+  typename Internals::EnableIf<
+      Internals::IsSame<typename Internals::RemoveConst<
+                            typename Internals::RemoveReference<T>::type>::type,
+                        JsonObject>::value,
       bool>::type
   is() const {
-    return _data && _data->isObject();
+    return variantIsObject();
   }
 
   // Returns true if the variant has a value
-  FORCE_INLINE bool isNull() const {
-    return _data == 0 || _data->isNull();
-  }
-
-  template <typename Visitor>
-  FORCE_INLINE void visit(Visitor &visitor) const {
-    if (_data)
-      _data->visit(visitor);
-    else
-      visitor.acceptNull();
+  bool success() const {
+    return _type != Internals::JSON_UNDEFINED;
   }
 
  private:
-  Internals::JsonBuffer *_buffer;
-  Internals::JsonVariantData *_data;
-};  // namespace ArduinoJson
+  JsonArray &variantAsArray() const;
+  JsonObject &variantAsObject() const;
+  const char *variantAsString() const;
+  template <typename T>
+  T variantAsFloat() const;
+  template <typename T>
+  T variantAsInteger() const;
+  bool variantIsBoolean() const;
+  bool variantIsFloat() const;
+  bool variantIsInteger() const;
+  bool variantIsArray() const {
+    return _type == Internals::JSON_ARRAY;
+  }
+  bool variantIsObject() const {
+    return _type == Internals::JSON_OBJECT;
+  }
+  bool variantIsString() const {
+    return _type == Internals::JSON_STRING ||
+           (_type == Internals::JSON_UNPARSED && _content.asString &&
+            !strcmp("null", _content.asString));
+  }
+
+  // The current type of the variant
+  Internals::JsonVariantType _type;
+
+  // The various alternatives for the value of the variant.
+  Internals::JsonVariantContent _content;
+};
+
+DEPRECATED("Decimal places are ignored, use the float value instead")
+inline JsonVariant float_with_n_digits(float value, uint8_t) {
+  return JsonVariant(value);
+}
+
+DEPRECATED("Decimal places are ignored, use the double value instead")
+inline JsonVariant double_with_n_digits(double value, uint8_t) {
+  return JsonVariant(value);
+}
 }  // namespace ArduinoJson

@@ -1,32 +1,27 @@
 // ArduinoJson - arduinojson.org
-// Copyright Benoit Blanchon 2014-2018
+// Copyright Benoit Blanchon 2014-2019
 // MIT License
 
 #pragma once
-
-#include <stdlib.h>  // size_t
 
 #include "JsonFloat.hpp"
 #include "JsonInteger.hpp"
 
 namespace ArduinoJson {
-namespace Internals {
-// Forward declarations
-struct JsonArrayData;
-struct JsonObjectData;
 
+// Forward declarations
+class JsonArray;
+class JsonObject;
+
+namespace Internals {
 // A union that defines the actual content of a JsonVariant.
 // The enum JsonVariantType determines which member is in use.
 union JsonVariantContent {
-  JsonFloat asFloat;         // used for double and float
-  JsonUInt asInteger;        // used for bool, char, short, int and longs
-  JsonArrayData* asArray;    // asArray cannot be null
-  JsonObjectData* asObject;  // asObject cannot be null
-  const char* asString;      // asString can be null
-  struct {
-    const char* data;
-    size_t size;
-  } asRaw;
+  JsonFloat asFloat;     // used for double and float
+  JsonUInt asInteger;    // used for bool, char, short, int and longs
+  const char* asString;  // asString can be null
+  JsonArray* asArray;    // asArray cannot be null
+  JsonObject* asObject;  // asObject cannot be null
 };
 }  // namespace Internals
 }  // namespace ArduinoJson

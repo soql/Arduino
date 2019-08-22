@@ -1,20 +1,18 @@
 // ArduinoJson - arduinojson.org
-// Copyright Benoit Blanchon 2014-2018
+// Copyright Benoit Blanchon 2014-2019
 // MIT License
 
 #include <ArduinoJson.h>
 #include <catch.hpp>
 
 void check(std::string originalJson) {
-  DynamicJsonDocument doc;
+  DynamicJsonBuffer jb;
 
   std::string prettyJson;
-  deserializeJson(doc, originalJson);
-  serializeJsonPretty(doc, prettyJson);
+  jb.parseObject(originalJson).prettyPrintTo(prettyJson);
 
   std::string finalJson;
-  deserializeJson(doc, originalJson);
-  serializeJson(doc, finalJson);
+  jb.parseObject(prettyJson).printTo(finalJson);
 
   REQUIRE(originalJson == finalJson);
 }

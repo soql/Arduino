@@ -1,5 +1,5 @@
 // ArduinoJson - arduinojson.org
-// Copyright Benoit Blanchon 2014-2018
+// Copyright Benoit Blanchon 2014-2019
 // MIT License
 //
 // This example shows how to store your project configuration in a file.
@@ -29,18 +29,16 @@ void loadConfiguration(const char *filename, Config &config) {
   // Open file for reading
   File file = SD.open(filename);
 
-  // Allocate the document on the stack.
-  // Don't forget to change the capacity to match your requirements.
+  // Allocate the memory pool on the stack.
+  // Don't forget to change the capacity to match your JSON document.
   // Use arduinojson.org/assistant to compute the capacity.
-  StaticJsonDocument<512> doc;
+  StaticJsonBuffer<512> jsonBuffer;
 
-  // Deserialize the JSON document
-  DeserializationError error = deserializeJson(doc, file);
-  if (error)
+  // Parse the root object
+  JsonObject &root = jsonBuffer.parseObject(file);
+
+  if (!root.success())
     Serial.println(F("Failed to read file, using default configuration"));
-
-  // Get the root object in the document
-  JsonObject root = doc.as<JsonObject>();
 
   // Copy values from the JsonObject to the Config
   config.port = root["port"] | 2731;
@@ -64,20 +62,20 @@ void saveConfiguration(const char *filename, const Config &config) {
     return;
   }
 
-  // Allocate the document on the stack.
-  // Don't forget to change the capacity to match your requirements.
-  // Use arduinojson.org/assistant to compute the capacity.
-  StaticJsonDocument<256> doc;
+  // Allocate the memory pool on the stack
+  // Don't forget to change the capacity to match your JSON document.
+  // Use https://arduinojson.org/assistant/ to compute the capacity.
+  StaticJsonBuffer<256> jsonBuffer;
 
-  // Make our document contain an object
-  JsonObject root = doc.to<JsonObject>();
+  // Parse the root object
+  JsonObject &root = jsonBuffer.createObject();
 
-  // Set the values in the object
+  // Set the values
   root["hostname"] = config.hostname;
   root["port"] = config.port;
 
   // Serialize JSON to file
-  if (serializeJson(doc, file) == 0) {
+  if (root.printTo(file) == 0) {
     Serial.println(F("Failed to write to file"));
   }
 
@@ -132,4 +130,15 @@ void loop() {
   // not used in this example
 }
 
-// Visit https://arduinojson.org/v6/example/config/ for more.
+// See also
+// --------
+//
+// https://arduinojson.org/ contains the documentation for all the functions
+// used above. It also includes an FAQ that will help you solve any
+// serialization or deserialization problem.
+//
+// The book "Mastering ArduinoJson" contains a case study of a project that has
+// a complex configuration with nested members.
+// Contrary to this example, the project in the book uses the SPIFFS filesystem.
+// Learn more at https://arduinojson.org/book/
+// Use the coupon code TWENTY for a 20% discount ❤❤❤❤❤

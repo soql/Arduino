@@ -1,6 +1,7 @@
 #include <SoftwareSerial.h>
-
+#include <ESP8266WiFi.h>
 #include <TinyGPS.h>
+#include <soql_tools.h>
 
 /* This sample code demonstrates the normal use of a TinyGPS object.
    It requires the use of SoftwareSerial, and assumes that you have a
@@ -8,14 +9,23 @@
 */
 
 TinyGPS gps;
-SoftwareSerial ss(4, 3);
+SoftwareSerial ss(D5, D6);
 
+
+#define TOKEN "GPSN"
+
+IPAddress mqttServerIP(192,168,1,163);  
 static void smartdelay(unsigned long ms);
 static void print_float(float val, float invalid, int len, int prec);
 static void print_int(unsigned long val, unsigned long invalid, int len);
 static void print_date(TinyGPS &gps);
 static void print_str(const char *str, int len);
+#define WIFI_COUNT 2
 
+wifi_struct wifi[WIFI_COUNT] = {     
+  {"ZJC-N"          , "820813130882"},
+  {"ZJC-S"          , "820813130882"}
+};
 void setup()
 {
   Serial.begin(115200);
@@ -28,6 +38,8 @@ void setup()
   Serial.println("-------------------------------------------------------------------------------------------------------------------------------------");
 
   ss.begin(4800);
+   ConnectToAP(wifi, WIFI_COUNT);
+   
 }
 
 void loop()
@@ -57,7 +69,11 @@ void loop()
   print_int(sentences, 0xFFFFFFFF, 10);
   print_int(failed, 0xFFFFFFFF, 9);
   Serial.println();
-  
+   String payload = "{";
+  payload += "\"flat\":"; payload += flat += ",";
+  payload += "\"flon\":"; payload += flon;  
+  payload += "}";
+ sendToMqtt(&client,"/gps", payload);
   smartdelay(1000);
 }
 

@@ -1,10 +1,10 @@
 // ArduinoJson - arduinojson.org
-// Copyright Benoit Blanchon 2014-2018
+// Copyright Benoit Blanchon 2014-2019
 // MIT License
 
 #pragma once
 
-#include "../Memory/JsonBuffer.hpp"
+#include "../JsonBuffer.hpp"
 #include "ListConstIterator.hpp"
 #include "ListIterator.hpp"
 
@@ -13,7 +13,7 @@ namespace Internals {
 
 // A singly linked list of T.
 // The linked list is composed of ListNode<T>.
-// It is derived by JsonArrayData and JsonObjectData
+// It is derived by JsonArray and JsonObject
 template <typename T>
 class List {
  public:
@@ -22,18 +22,31 @@ class List {
   typedef ListIterator<T> iterator;
   typedef ListConstIterator<T> const_iterator;
 
-  List() : _firstNode(NULL) {}
+  // Creates an empty List<T> attached to a JsonBuffer.
+  // The JsonBuffer allows to allocate new nodes.
+  // When buffer is NULL, the List is not able to grow and success() returns
+  // false. This is used to identify bad memory allocations and parsing
+  // failures.
+  explicit List(JsonBuffer *buffer) : _buffer(buffer), _firstNode(NULL) {}
+
+  // Returns true if the object is valid
+  // Would return false in the following situation:
+  // - the memory allocation failed (StaticJsonBuffer was too small)
+  // - the JSON parsing failed
+  bool success() const {
+    return _buffer != NULL;
+  }
 
   // Returns the numbers of elements in the list.
-  // For a JsonObjectData, it would return the number of key-value pairs
+  // For a JsonObject, it would return the number of key-value pairs
   size_t size() const {
     size_t nodeCount = 0;
     for (node_type *node = _firstNode; node; node = node->next) nodeCount++;
     return nodeCount;
   }
 
-  iterator add(JsonBuffer *buffer) {
-    node_type *newNode = new (buffer) node_type();
+  iterator add() {
+    node_type *newNode = new (_buffer) node_type();
 
     if (_firstNode) {
       node_type *lastNode = _firstNode;
@@ -72,9 +85,7 @@ class List {
   }
 
  protected:
-  void clear() {
-    _firstNode = 0;
-  }
+  JsonBuffer *_buffer;
 
  private:
   node_type *_firstNode;

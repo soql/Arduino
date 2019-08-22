@@ -1,5 +1,5 @@
 // ArduinoJson - arduinojson.org
-// Copyright Benoit Blanchon 2014-2018
+// Copyright Benoit Blanchon 2014-2019
 // MIT License
 
 #include <ArduinoJson.h>
@@ -22,15 +22,23 @@ TEST_CASE("DynamicJsonBuffer no memory") {
     NoMemoryAllocator().deallocate(NULL);
   }
 
-  // TODO: uncomment
-  // SECTION("deserializeJson()") {
-  //   char json[] = "{[]}";
-  //   DynamicJsonDocument obj;
+  SECTION("createArray()") {
+    REQUIRE_FALSE(_jsonBuffer.createArray().success());
+  }
 
-  //   DeserializationError err = deserializeJson(obj, json);
+  SECTION("createObject()") {
+    REQUIRE_FALSE(_jsonBuffer.createObject().success());
+  }
 
-  //   REQUIRE(err != DeserializationError::Ok);
-  // }
+  SECTION("parseArray()") {
+    char json[] = "[]";
+    REQUIRE_FALSE(_jsonBuffer.parseArray(json).success());
+  }
+
+  SECTION("parseObject()") {
+    char json[] = "{}";
+    REQUIRE_FALSE(_jsonBuffer.parseObject(json).success());
+  }
 
   SECTION("startString()") {
     DynamicJsonBufferBase<NoMemoryAllocator>::String str =

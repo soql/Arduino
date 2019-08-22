@@ -1,5 +1,5 @@
 # ArduinoJson - arduinojson.org
-# Copyright Benoit Blanchon 2014-2018
+# Copyright Benoit Blanchon 2014-2019
 # MIT License
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "(GNU|Clang)")
@@ -24,7 +24,6 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "(GNU|Clang)")
 		-Wshadow
 		-Wsign-promo
 		-Wstrict-aliasing
-		-Wstrict-overflow=5
 		-Wundef
 	)
 
@@ -38,9 +37,7 @@ endif()
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
 	add_compile_options(
 		-Wstrict-null-sentinel
-		-Wno-vla # Allow VLA in tests
 	)
-	add_definitions(-DHAS_VARIABLE_LENGTH_ARRAY)
 
 	if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 4.5)
 		add_compile_options(-Wlogical-op) # the flag exists in 4.4 but is buggy
@@ -49,17 +46,18 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
 	if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 4.6)
 		add_compile_options(-Wnoexcept)
 	endif()
+
+	if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 4.7 AND 
+	   CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.8)
+		# avoid false positive with GCC 4.7
+		add_compile_options(-Wno-maybe-uninitialized)
+	endif()
 endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 	add_compile_options(
 		-Wc++11-compat
 		-Wdeprecated-register
-		-Wno-vla-extension # Allow VLA in tests
-	)
-	add_definitions(
-		-DHAS_VARIABLE_LENGTH_ARRAY
-		-DSUBSCRIPT_CONFLICTS_WITH_BUILTIN_OPERATOR
 	)
 endif()
 
@@ -74,14 +72,10 @@ endif()
 add_subdirectory(DynamicJsonBuffer)
 add_subdirectory(IntegrationTests)
 add_subdirectory(JsonArray)
-add_subdirectory(JsonDeserializer)
-add_subdirectory(JsonDocument)
+add_subdirectory(JsonBuffer)
 add_subdirectory(JsonObject)
-add_subdirectory(JsonSerializer)
 add_subdirectory(JsonVariant)
 add_subdirectory(JsonWriter)
 add_subdirectory(Misc)
-add_subdirectory(MsgPackDeserializer)
-add_subdirectory(MsgPackSerializer)
-add_subdirectory(Numbers)
+add_subdirectory(Polyfills)
 add_subdirectory(StaticJsonBuffer)

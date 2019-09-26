@@ -83,17 +83,20 @@ uint64_t reg_a;
 uint64_t reg_b;
 uint64_t reg_c;
 
+int analogPin1=14;
+int analogPin2=2;
 
 ESP32_FTPClient ftp (ftp_server, ftp_user, ftp_pass);
 String timeRead;
-int batteryState;
+int batteryState1=0;
+int batteryState2=0;
 void FTP_upload();
 void sendToMqtt(PubSubClient client){
   String payload;    
     
     payload = "{"; 
     payload += "\"time\":\"";payload+=timeRead; payload += "\",";
-    payload += "\"batteryRaw\":\"";payload+=String(batteryState); payload += "\"";
+    payload += "\"batteryRaw\":\"";payload+=String(batteryState2); payload += "\"";
     payload += "}";
  sendToMqtt(&client,OUT_TOPIC, payload);
 }
@@ -106,33 +109,39 @@ reg_c = READ_PERI_REG(SENS_SAR_MEAS_START2_REG);
   btStop();
   Serial.begin(115200);
   Serial.setDebugOutput(true);
-  batteryState=0;
+  batteryState1=0;
+  batteryState2=0;
   delay(2000);
 
 
 
   
-  pinMode(14, INPUT);
+  pinMode(analogPin1, INPUT);
+  pinMode(analogPin2, INPUT);
   
- //analogSetAttenuation(ADC_0db);
+ analogSetAttenuation(ADC_0db);
  delay(100);
- Serial.println(adcAttachPin(14));
+ Serial.println(adcAttachPin(analogPin1));
+ Serial.println(adcAttachPin(analogPin2));
  delay(100);
  // analogReadResolution(11);
  // analogSetAttenuation(ADC_6db);
- //Serial.println(adcStart(pin));
- digitalWrite(14,1);
-  batteryState=0;
+ //Serial.println(adcStart(pin)); 
+  batteryState1=0;
+  batteryState2=0;
  delay(100);
   Serial.println("ADC MESS START");
   Serial.println(SENS_SAR_START_FORCE_REG);
   Serial.println(SENS_SAR_READ_CTRL2_REG);
   for(int j=0; j<5; j++){
-    batteryState = batteryState+analogRead(14);
+    batteryState1 = batteryState1+analogRead(analogPin1);
+    batteryState2 = batteryState2+analogRead(analogPin2);
     delay(200);
   }
-  batteryState=batteryState/5;  
-  Serial.println(batteryState);  
+  batteryState1=batteryState1/5;  
+  batteryState2=batteryState2/5;  
+  Serial.println(batteryState1);  
+  Serial.println(batteryState2);  
  
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); 
 
@@ -228,17 +237,7 @@ reg_c = READ_PERI_REG(SENS_SAR_MEAS_START2_REG);
   delay(1000);
   WRITE_PERI_REG(SENS_SAR_START_FORCE_REG, reg_a);  // fix ADC registers
   WRITE_PERI_REG(SENS_SAR_READ_CTRL2_REG, reg_b);
-  WRITE_PERI_REG(SENS_SAR_MEAS_START2_REG, reg_c);
-    Serial.println("ADC MESS START");
-  Serial.println(SENS_SAR_START_FORCE_REG);
-  Serial.println(SENS_SAR_READ_CTRL2_REG);
-  batteryState=0;
-  for(int j=0; j<5; j++){
-    batteryState = batteryState+analogRead(14);
-    delay(200);
-  }
-  batteryState=batteryState/5;  
-  Serial.println(batteryState);  
+  WRITE_PERI_REG(SENS_SAR_MEAS_START2_REG, reg_c);    
  goDeepSleep(3);
   Serial.println("This will never be printed");
 }

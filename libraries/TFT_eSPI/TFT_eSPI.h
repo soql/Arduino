@@ -37,7 +37,7 @@
   #define SPI_READ_FREQUENCY SPI_FREQUENCY
 #endif
 
-#ifdef ST7789_DRIVER
+#if defined(ST7789_DRIVER) || defined(ST7789_2_DRIVER)
   #define TFT_SPI_MODE SPI_MODE3
 #else
   #define TFT_SPI_MODE SPI_MODE0
@@ -334,7 +334,7 @@
 
   // Convert swapped byte 16 bit colour to 18 bit and write in 3 bytes
   #define tft_Write_16S(C) spi.transfer(C & 0xF8); \
-                           spi.transfer((C & 0xE0)>>11 | (C & 0x07)<<5); \
+                           spi.transfer((C & 0xE000)>>11 | (C & 0x07)<<5); \
                            spi.transfer((C & 0x1F00)>>5)
   // Write 32 bits to TFT
   #define tft_Write_32(C)  spi.write32(C)
@@ -808,8 +808,8 @@ class TFT_eSPI : public Print {
 
   void     setAddrWindow(int32_t xs, int32_t ys, int32_t w, int32_t h);
 
-           // Compatibility additions (non-essential)
-  void     startWrite(void);                         // Begin SPI transaction (not normally needed)
+           // Compatibility additions
+  void     startWrite(void);                         // Begin SPI transaction
   void     writeColor(uint16_t color, uint32_t len); // Write colours without transaction overhead
   void     endWrite(void);                           // End SPI transaction
 
@@ -825,7 +825,13 @@ class TFT_eSPI : public Print {
   void     end_SDA_Read(void);
 #endif
 
+  // Set or get an arbitrary library attribute or configuration option
+  void     setAttribute(uint8_t id = 0, uint8_t a = 0);
+  uint8_t  getAttribute(uint8_t id = 0);
+
   void     getSetup(setup_t& tft_settings); // Sketch provides the instance to populate
+
+  static   SPIClass& getSPIinstance(void);
 
   int32_t  cursor_x, cursor_y, padX;
   uint32_t textcolor, textbgcolor;
@@ -877,17 +883,19 @@ class TFT_eSPI : public Print {
 
   uint32_t fontsloaded;
 
-  uint8_t  glyph_ab,  // glyph height above baseline
-           glyph_bb;  // glyph height below baseline
+  uint8_t  glyph_ab,   // glyph delta Y (height) above baseline
+           glyph_bb;   // glyph delta Y (height) below baseline
 
-  bool     isDigits;  // adjust bounding box for numbers to reduce visual jiggling
+  bool     isDigits;   // adjust bounding box for numbers to reduce visual jiggling
   bool     textwrapX, textwrapY;   // If set, 'wrap' text at right and optionally bottom edge of display
   bool     _swapBytes; // Swap the byte order for TFT pushImage()
   bool     locked, inTransaction; // Transaction and mutex lock flags for ESP32
 
-  bool     _booted;
+  bool     _booted;    // init() or begin() has already run once
+  bool     _cp437;     // If set, use correct CP437 charset (default is ON)
+  bool     _utf8;      // If set, use UTF-8 decoder in print stream 'write()' function (default ON)
 
-  uint32_t _lastColor;
+  uint32_t _lastColor; // Buffered value of last colour used
 
 #ifdef LOAD_GFXFF
   GFXfont  *gfxFont;

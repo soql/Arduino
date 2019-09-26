@@ -36,14 +36,11 @@
 //                                  Libraries
 //====================================================================================
 // Call up the SPIFFS FLASH filing system this is part of the ESP Core
-#define FS_NO_GLOBALS
-#include <FS.h>
-#include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 
 // JPEG decoder library
 #include <TFT_eFEX.h>
-#include <ESP8266HTTPClient.h>
+#include <HTTPClient.h>
 // SPI library, built into IDE
 #include <SPI.h>
 
@@ -55,11 +52,79 @@
 // Invoke TFT library
 TFT_eSPI tft = TFT_eSPI();
 HTTPClient http;
-
-const char* ssid = "ZJC-N";
+#define USE_SERIAL Serial
+const char* ssid = "SoqlNet";
 const char* password = "820813130882";
 const char* host = "esp8266fs";
+TFT_eFEX  fex = TFT_eFEX(&tft);
+uint8_t PicArray[80950] = {0}; //Array for picture make sure under 15K
+int pic = 1;
+void GetPic() {
+  HTTPClient http;
+  long totalSize = 0;
+  boolean chone = 1;
+  // configure server and url update based on your URL
+  http.begin("http://zjc.oth.net.pl:8765/picture/1/current?width=320");  //update based on your URL
+  //http.begin("http://10.16.10.11:8980/tempgr/ac/BaboonL.jpg");
+  // start connection and send HTTP header
+  long httpCode = http.GET();
+  if (httpCode > 0) {
+    // HTTP header has been send and Server response header has been handled
+    USE_SERIAL.printf("[HTTP] GET... code: %d\n", httpCode);
 
+    // file found at server
+    if (httpCode == HTTP_CODE_OK) {
+
+      // get lenght of document (is -1 when Server sends no Content-Length header)
+      long len = http.getSize();
+
+      // create buffer for read
+      uint8_t buff[2048] = { 0 };
+
+      // get tcp stream
+      WiFiClient * stream = http.getStreamPtr();
+
+      // read all data from server
+      while (http.connected() && (len > 0 || len == -1)) {
+        size_t size = stream->available();
+        if (size) {
+
+          int c = stream->readBytes(buff, ((size > sizeof(buff)) ? sizeof(buff) : size));
+          memcpy (PicArray + totalSize, buff, c);
+          totalSize = totalSize + c;
+
+          if (len > 0) {
+            len -= c;
+          }
+        }
+
+        yield();
+      }
+      USE_SERIAL.print("[HTTP] connection closed or file end.\n");
+
+    }
+  } else {
+    USE_SERIAL.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+  }
+
+  http.end();
+
+  USE_SERIAL.println("TotalS:" + String(totalSize));
+
+  USE_SERIAL.print("First 10 Bytes: ");
+  for (int ipt = 0; ipt < 11; ipt++) {
+    USE_SERIAL.print(PicArray[ipt], HEX);
+    USE_SERIAL.print(",");
+  }
+  USE_SERIAL.print("\nLast 10 Bytes : ");
+  for (int ipt = 10; ipt >= 0; ipt--) {
+    USE_SERIAL.print(PicArray[totalSize - ipt], HEX);
+    USE_SERIAL.print(",");
+  }
+  USE_SERIAL.println("");
+  uint8_t scale = (uint8_t)JPEG_DIV_2;
+  fex.drawJpg(PicArray, sizeof(totalSize), 0, 0);
+}
 //====================================================================================
 //                                    Setup
 //====================================================================================
@@ -83,12 +148,9 @@ void setup()
   tft.begin();
   tft.setRotation(3);  // 0 & 2 Portrait. 1 & 3 landscape
   tft.fillScreen(TFT_BLACK);
-  tft.invertDisplay(true);
+ // tft.invertDisplay(true);
 
-  if (!SPIFFS.begin()) {
-    Serial.println("SPIFFS initialisation failed!");
-    while (1) yield(); // Stay here twiddling thumbs waiting
-  }
+  
   Serial.println("\r\nInitialisation done.");
 
 }
@@ -96,41 +158,13 @@ void setup()
 //====================================================================================
 //                                    Loop
 //====================================================================================
+  
 void loop()
 {
+  tft.setRotation(3);  // portrait   
   
-    String url = "http://192.168.1.234/lcd4linux/dpf.jpg"    ;
-    String file_name = "/dpf.jpg";
-    Serial.println(url);
-    fs::File f = SPIFFS.open(file_name, "w");
-    if (f) {
-      http.begin(url);
-      int httpCode = http.GET();
-      if (httpCode > 0) {
-        if (httpCode == HTTP_CODE_OK) {
-          http.writeToStream(&f);
-        }
-      } else {
-        Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
-      }
-      f.close();
-    }
-    http.end();
-  // Note the / before the SPIFFS file name must be present, this means the file is in
-  // the root directory of the SPIFFS, e.g. "/Tiger.jpg" for a file called "Tiger.jpg"
+  GetPic();
 
-  tft.setRotation(3);  // portrait
-  //tft.fillScreen(random(0xFFFF));
-
-  drawJpeg("/dpf.jpg", 0, 0);  
-
-  // Create arrays from the jpeg images and send them to the serial port for copy and
-  // pasting into a sketch (used to make arrays fot the TFT_FLASH_Jpeg sketch)
-
-  //createArray("/EagleEye160.jpg");
-  //createArray("/tiger160.jpg");
-  //createArray("/Baboon160.jpg");
-  //createArray("/Mouse160.jpg");
-  //while(1) yield(); // Stay here
+ 
 }
 //====================================================================================

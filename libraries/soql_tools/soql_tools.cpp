@@ -94,9 +94,11 @@ String getMAC()
 
 String generateTechInfo(int version, char* info){
   String payload = "{";
-  payload += "\"macAddress\":"; payload += getMAC(); payload += ",";
-  payload += "\"version\":"; payload += String(version);payload += ",";
-  payload += "\"info\":"; payload += String(info);
+  payload += "\"macAddress\":\""; payload += getMAC(); payload += "\",";
+  payload += "\"version\":\""; payload += String(version);payload += "\",";
+  payload += "\"info\":\""; payload += String(info);payload += "\",";
+  payload += "\"rssi\":\""; payload += WiFi.RSSI();payload += "\",";
+  payload += "\"ssid\":\""; payload += WiFi.SSID(); payload += "\"";
   payload += "}";
   return payload;
 }

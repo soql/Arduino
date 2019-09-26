@@ -50,7 +50,7 @@ JPEGDecoder::JPEGDecoder(){
 
 
 JPEGDecoder::~JPEGDecoder(){
-	if (pImage) delete pImage;
+	if (pImage) delete[] pImage;
 	pImage = NULL;
 }
 
@@ -65,7 +65,7 @@ uint8_t JPEGDecoder::pjpeg_callback(uint8_t* pBuf, uint8_t buf_size, uint8_t *pB
 uint8_t JPEGDecoder::pjpeg_need_bytes_callback(uint8_t* pBuf, uint8_t buf_size, uint8_t *pBytes_actually_read, void *pCallback_data) {
 	uint n;
 
-	pCallback_data;
+	//pCallback_data;
 
 	n = jpg_min(g_nInFileSize - g_nInFileOfs, buf_size);
 
@@ -273,7 +273,7 @@ int JPEGDecoder::readSwappedBytes(void) {
 // Generic file call for SD or SPIFFS, uses leading / to distinguish SPIFFS files
 int JPEGDecoder::decodeFile(const char *pFilename){
 
-#ifdef ESP8266
+#if defined (ESP8266) || defined (ESP32)
 #if defined (LOAD_SD_LIBRARY) || defined (LOAD_SDFAT_LIBRARY)
 	if (*pFilename == '/')
 #endif
@@ -289,7 +289,7 @@ int JPEGDecoder::decodeFile(const char *pFilename){
 
 int JPEGDecoder::decodeFile(const String& pFilename){
 
-#ifdef ESP8266
+#if defined (ESP8266) || defined (ESP32)
 #if defined (LOAD_SD_LIBRARY) || defined (LOAD_SDFAT_LIBRARY)
 	if (pFilename.charAt(0) == '/')
 #endif
@@ -407,6 +407,15 @@ int JPEGDecoder::decodeArray(const uint8_t array[], uint32_t  array_size) {
 
 int JPEGDecoder::decodeCommon(void) {
 
+	width = 0;
+	height = 0;
+	comps = 0;
+	MCUSPerRow = 0;
+	MCUSPerCol = 0;
+	scanType = (pjpeg_scan_type_t)0;
+	MCUWidth = 0;
+	MCUHeight = 0;
+
 	status = pjpeg_decode_init(&image_info, pjpeg_callback, NULL, 0);
 
 	if (status) {
@@ -419,7 +428,7 @@ int JPEGDecoder::decodeCommon(void) {
 		}
 		#endif
 
-		return -1;
+		return 0;
 	}
 
 	decoded_width =  image_info.m_width;
@@ -427,14 +436,8 @@ int JPEGDecoder::decodeCommon(void) {
 	
 	row_pitch = image_info.m_MCUWidth;
 	pImage = new uint16_t[image_info.m_MCUWidth * image_info.m_MCUHeight];
-	if (!pImage) {
-		#ifdef DEBUG
-		Serial.println("Memory Allocation Failure");
-		#endif
 
-		return -1;
-	}
-	memset(pImage , 0 , sizeof(pImage));
+	memset(pImage , 0 , image_info.m_MCUWidth * image_info.m_MCUHeight * sizeof(*pImage));
 
 	row_blocks_per_mcu = image_info.m_MCUWidth >> 3;
 	col_blocks_per_mcu = image_info.m_MCUHeight >> 3;
@@ -458,7 +461,7 @@ void JPEGDecoder::abort(void) {
 	mcu_x = 0 ;
 	mcu_y = 0 ;
 	is_available = 0;
-	if(pImage) delete pImage;
+	if(pImage) delete[] pImage;
 	pImage = NULL;
 	
 #ifdef LOAD_SPIFFS

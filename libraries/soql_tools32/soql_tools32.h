@@ -16,7 +16,7 @@ void checkForUpdates(int version);
 void sendToMqtt(PubSubClient* client, char* topic, String dataToSend);
 void initSerial(int baudrate);
 uint32_t getTimeFromNTP(IPAddress timeServerIP);
-void goDeepSleep(int timeInSeconds, boolean deep);
+void goDeepSleep(long timeInSeconds);
 
 #endif /*_SOQL_TOOLS_H */
 

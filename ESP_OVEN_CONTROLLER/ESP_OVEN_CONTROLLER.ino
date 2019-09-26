@@ -2,11 +2,13 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include <Servo.h>
+
 #include <soql_tools.h>
 #include <NTPClient.h>
 #include <WiFiUdp.h>
+#include <EEPROM.h>
 
-#define FW_VERSION 14
+#define FW_VERSION 20
 #define FW_INFO "Kontroller pieca zjc"
 
 wifi_struct wifi[2]={
@@ -23,11 +25,11 @@ NTPClient timeClient(ntpUDP, "192.168.1.168", 0, 60000);
 #define IN_TOPIC "/telemetry/oven/set"
 #define OUT_TOPIC "/telemetry/oven/get"
 
-#define SERVO_PORT D3
+#define SERVO_PORT D2
 
 #define WIFI_COUNT 2
 /*DHT22*/
-static const int DHT_SENSOR_PIN = D4;
+static const int DHT_SENSOR_PIN = D1;
 
 #define DHT_SENSOR_TYPE DHT_TYPE_22
 
@@ -40,17 +42,35 @@ void callback(char* topic, byte* payload, unsigned int length);
 
 float temperature;
 float humidity;  
-int termostatValue=8;
 
+  uint addr = 0;
 /*MQTT**/
 WiFiClient wifiClient;
 PubSubClient client(wifiClient);
 Servo termostat;
+int termostatValue=9;
+void eeWriteInt(int pos, int val) {
+    byte* p = (byte*) &val;
+    EEPROM.write(pos, *p);
+    EEPROM.write(pos + 1, *(p + 1));
+    EEPROM.write(pos + 2, *(p + 2));
+    EEPROM.write(pos + 3, *(p + 3));
+    EEPROM.commit();
+}
+int eeGetInt(int pos) {
+  int val;
+  byte* p = (byte*) &val;
+  *p        = EEPROM.read(pos);
+  *(p + 1)  = EEPROM.read(pos + 1);
+  *(p + 2)  = EEPROM.read(pos + 2);
+  *(p + 3)  = EEPROM.read(pos + 3);
+  return val;
+}
 
 void setup() {
+ EEPROM.begin(512);
  Serial.begin(115200); 
- delay(1000);  
- 
+ delay(1000);   
  ConnectToAP(wifi, WIFI_COUNT);
  connectToMQTT(&client, mqttServerIP, TOKEN, callback, onConnect);
  sendToMqtt(&client,"/telemetry/technical/info", generateTechInfo(FW_VERSION, FW_INFO));
@@ -60,9 +80,11 @@ void setup() {
  delay(1000); 
  termostat.attach(SERVO_PORT);
  delay(1000); 
- int toWrite=map(termostatValue, 6, 24, 0, 165);
- termostat.write(toWrite);    
+ termostatValue=eeGetInt(0);
+ int toWrite=map(termostatValue, 6, 24, 0, 105);
  
+ termostat.write(toWrite);    
+ Serial.println("Debug 1");
  
 }
 
@@ -77,12 +99,17 @@ void callback(char* topic, byte* payload, unsigned int length) {
     String p;
     for(int j=0; j<length; j++){
       p+=(char)payload[j];
-    }    
+    }        
+    if(p.equals("RESET")){
+      goDeepSleep(1, false);
+    }
     if(termostatValue!=p.toInt()){
-      termostatValue=p.toInt();      
+      termostatValue=p.toInt(); 
+       pinMode(SERVO_PORT, OUTPUT);     
       termostat.attach(SERVO_PORT);
-      int toWrite=map(termostatValue, 6, 24, 0, 165);
-      termostat.write(toWrite);    
+      int toWrite=map(termostatValue, 6, 24, 0, 105);
+      termostat.write(toWrite);   
+      eeWriteInt(0,termostatValue);             
       generateAndSend();
     }
   }
@@ -106,7 +133,7 @@ void loop() {
   
 }
 
-void generateAndSend(){
+void generateAndSend(){  
   String payload = "{";
     payload += "\"temperature\":"; payload += temperature; payload += ",";
     payload += "\"humidity\":"; payload += humidity; payload += ",";

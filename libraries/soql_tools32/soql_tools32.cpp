@@ -6,14 +6,11 @@
 
 const char* fwUrlBase = "http://esp.oth.net.pl:8099/";
 
-void goDeepSleep(int timeInSeconds, boolean deep){
-	if(deep){
-		 Serial.println("Go into deepsleep mode.");
-		 ESP.deepSleep(1000000*timeInSeconds);
-	}else{
-	 delay(1000*timeInSeconds);
-	 ESP.restart();
-	}
+#define uS_TO_S_FACTOR 1000000  //Conversion factor for micro seconds to seconds
+
+void goDeepSleep(long secounds){
+  esp_sleep_enable_timer_wakeup(uS_TO_S_FACTOR * secounds);
+  esp_deep_sleep_start();
 }
 
 int ConnectToAP(wifi_struct wifilist[], int wifisize)

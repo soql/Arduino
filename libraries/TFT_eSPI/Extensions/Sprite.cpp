@@ -1059,6 +1059,8 @@ int16_t TFT_eSprite::height(void)
 // Does nothing for 8 and 16 bpp sprites. TODO allow rotation of these sprites
 void TFT_eSprite::setRotation(uint8_t rotation)
 {
+  if (_bpp != 1) return;
+
   _rotation = rotation;
   if (rotation == 0 && _iwidth > _iheight) swap_coord(_iwidth, _iheight);
   if (rotation == 1 && _iwidth < _iheight) swap_coord(_iwidth, _iheight);
@@ -1085,19 +1087,24 @@ uint8_t TFT_eSprite::getRotation(void)
 void TFT_eSprite::drawPixel(int32_t x, int32_t y, uint32_t color)
 {
   // Range checking
-  if ((x < 0) || (y < 0) ||(x >= _width) || (y >= _height) || !_created) return;
+  if ((x < 0) || (y < 0) || !_created) return;
 
   if (_bpp == 16)
   {
+    if ((x >= _iwidth) || (y >= _iheight)) return;
     color = (color >> 8) | (color << 8);
     _img[x+y*_iwidth] = (uint16_t) color;
   }
   else if (_bpp == 8)
   {
+    if ((x >= _iwidth) || (y >= _iheight)) return;
     _img8[x+y*_iwidth] = (uint8_t)((color & 0xE000)>>8 | (color & 0x0700)>>6 | (color & 0x0018)>>3);
   }
   else // 1 bpp
   {
+
+    if ((x >= _iwidth) || (y >= _iheight)) return;
+
     if (_rotation == 1)
     {
       uint16_t tx = x;
@@ -1674,7 +1681,7 @@ int16_t TFT_eSprite::drawChar(uint16_t uniCode, int32_t x, int32_t y, uint8_t fo
     if ((font>2) && (font<9))
     {
       // This is slower than above but is more convenient for the RLE fonts
-      flash_address = pgm_read_dword( pgm_read_dword( &(fontdata[font].chartbl ) ) + uniCode*sizeof(void *) );
+      flash_address = pgm_read_dword( (const void*) (pgm_read_dword( &(fontdata[font].chartbl ) ) + uniCode*sizeof(void *)) );
       width = pgm_read_byte( (uint8_t *)pgm_read_dword( &(fontdata[font].widthtbl ) ) + uniCode );
       height= pgm_read_byte( &fontdata[font].height );
     }

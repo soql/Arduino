@@ -10,6 +10,8 @@ const char* fwUrlBase = "http://esp.oth.net.pl:8099/";
 
 void goDeepSleep(long secounds){
   esp_sleep_enable_timer_wakeup(uS_TO_S_FACTOR * secounds);
+  Serial.flush();
+  delay(100);
   esp_deep_sleep_start();
 }
 

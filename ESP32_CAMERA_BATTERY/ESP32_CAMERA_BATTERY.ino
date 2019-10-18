@@ -54,7 +54,6 @@
 #define FW_INFO "Kamera bateria"
 #define OUT_TOPIC "/telemetry/camera1/data"
 
-int pictureNumber = 0;
 // FTP Server credentials
 char ftp_server[] = "zjc.oth.net.pl";
 char ftp_user[]   = "esp32cam";
@@ -65,17 +64,17 @@ camera_fb_t * fb = NULL;
 
 /*NtpClient*/
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "192.168.2.2");
+NTPClient timeClient(ntpUDP, "192.168.1.168");
 
-IPAddress mqttServerIP(192,168,2,2);
+IPAddress mqttServerIP(192,168,1,168);
 
 #define WIFI_COUNT 4
 
-wifi_struct wifi[WIFI_COUNT] = {       
-  {"SoqlNet"  , "820813130882"},
+wifi_struct wifi[WIFI_COUNT] = {           
+  {"ZJC-W","820813130882"},\
   {"ZJC-N"  , "820813130882"},
-  {"ZJC-W","820813130882"},
   {"ZJCCRYPTO","820813130882"},
+  {"SoqlNet"  , "820813130882"}
   
 };
 
@@ -84,21 +83,95 @@ uint64_t reg_b;
 uint64_t reg_c;
 
 int analogPin1=14;
-int analogPin2=2;
+
+/*Co ile sekund fota*/
+int deepSleepTime=30*60;
 
 ESP32_FTPClient ftp (ftp_server, ftp_user, ftp_pass);
+
 String timeRead;
 int batteryState1=0;
-int batteryState2=0;
+
 void FTP_upload();
+void goDeepSleepInt(int sec){
+    WRITE_PERI_REG(SENS_SAR_START_FORCE_REG, reg_a);  // fix ADC registers
+  WRITE_PERI_REG(SENS_SAR_READ_CTRL2_REG, reg_b);
+  WRITE_PERI_REG(SENS_SAR_MEAS_START2_REG, reg_c);    
+ goDeepSleep(sec);  
+}
 void sendToMqtt(PubSubClient client){
-  String payload;    
-    
+  String payload;        
     payload = "{"; 
     payload += "\"time\":\"";payload+=timeRead; payload += "\",";
-    payload += "\"batteryRaw\":\"";payload+=String(batteryState2); payload += "\"";
+    payload += "\"batteryRaw\":\"";payload+=String(batteryState1); payload += "\"";
     payload += "}";
  sendToMqtt(&client,OUT_TOPIC, payload);
+}
+int ConnectToAPInt(wifi_struct wifilist[], int wifisize)
+{
+  if(WiFi.status() == WL_CONNECTED){
+  return 1;
+  }else{
+  Serial.println("");
+  }
+  Serial.flush();
+  for(int i=0; i<wifisize; i++){
+    int retry=0;
+    if(WiFi.status() == WL_CONNECTED)
+      return 1;
+    Serial.print("Connecting to AP ");
+    Serial.print(wifilist[i].ssid.c_str());
+
+    WiFi.begin(wifilist[i].ssid.c_str(), wifilist[i].password.c_str());
+    while (WiFi.status() != WL_CONNECTED) {
+      delay(300);
+      Serial.print(".");
+      Serial.flush();
+      retry++;
+      if(retry>=40){
+        Serial.println(".");
+        break;
+      }
+    }
+    if(WiFi.status() != WL_CONNECTED)
+      continue;
+    Serial.println("Connected to AP");
+    Serial.flush();
+    return 1;
+  }
+  Serial.println("Cannot start wifi connection :-(");
+  goDeepSleepInt(5);
+  return 0;
+}
+
+
+void connectToMQTTInt(PubSubClient* client, IPAddress mqttServerIP, char* token, void (*callback)(char*, uint8_t*, uint32_t), void (*onConnect)(PubSubClient*)){
+   if(client->connected()){
+     return;
+   }
+   int retry=0;
+   Serial.print("Connecting to MQTT Server ...");
+   while ( !client->connected() ) {
+    Serial.print(".");
+    client->setServer( mqttServerIP, 1883);
+    if(callback!=NULL){
+      client->setCallback(callback);
+    }
+     if ( client->connect(token) ) {
+       if(onConnect!=NULL){
+           onConnect(client);
+       }
+       Serial.println( "[DONE]" );
+     }else{
+       delay( 100 );
+       retry++;
+       Serial.print(".");
+         if(retry>=10){
+        Serial.println("[ERROR] Cannot connect to MQTT Server");
+        goDeepSleepInt(5);
+      }
+     }
+   }
 }
 
 void setup() {  
@@ -109,42 +182,44 @@ reg_c = READ_PERI_REG(SENS_SAR_MEAS_START2_REG);
   btStop();
   Serial.begin(115200);
   Serial.setDebugOutput(true);
-  batteryState1=0;
-  batteryState2=0;
+  batteryState1=0; 
   delay(2000);
 
 
 
-  
-  pinMode(analogPin1, INPUT);
-  pinMode(analogPin2, INPUT);
-  
- analogSetAttenuation(ADC_0db);
+ /* analogSetCycles(8);                        
+  analogSetSamples(1);                       
+  analogSetClockDiv(1);                     
+  analogSetAttenuation(ADC_0db); */
+  pinMode(analogPin1, INPUT);  
+/*  adcAttachPin(analogPin1);*/
+ /* analogSetClockDiv(255);*/
  delay(100);
- Serial.println(adcAttachPin(analogPin1));
- Serial.println(adcAttachPin(analogPin2));
- delay(100);
- // analogReadResolution(11);
- // analogSetAttenuation(ADC_6db);
- //Serial.println(adcStart(pin)); 
-  batteryState1=0;
-  batteryState2=0;
- delay(100);
+/* for(int j=0; j<15; j++){
+ adcStart(analogPin1);
+  while ( adcBusy(analogPin1));  
+  batteryState1 = batteryState1 + adcEnd(analogPin1);
+  delay(100);
+ }  */
+ for(int j=0; j<15; j++){   
+  batteryState1 = batteryState1 + analogRead(analogPin1);
+  delay(100);
+ } 
+  Serial.println(batteryState1/15);
+  delay(100);
+ 
+ /*delay(100);
   Serial.println("ADC MESS START");
   Serial.println(SENS_SAR_START_FORCE_REG);
   Serial.println(SENS_SAR_READ_CTRL2_REG);
-  for(int j=0; j<5; j++){
-    batteryState1 = batteryState1+analogRead(analogPin1);
-    batteryState2 = batteryState2+analogRead(analogPin2);
+  for(int j=0; j<15; j++){
+    batteryState1 = batteryState1+analogRead(analogPin1);    
     delay(200);
-  }
-  batteryState1=batteryState1/5;  
-  batteryState2=batteryState2/5;  
-  Serial.println(batteryState1);  
-  Serial.println(batteryState2);  
+  }*/
+  batteryState1=batteryState1/15;   
+  Serial.println(batteryState1);     
  
-  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); 
-
+  /*WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); *///disable brownout detector
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
@@ -172,59 +247,58 @@ reg_c = READ_PERI_REG(SENS_SAR_MEAS_START2_REG);
     config.frame_size = FRAMESIZE_UXGA; // FRAMESIZE_ + QVGA|CIF|VGA|SVGA|XGA|SXGA|UXGA
     config.jpeg_quality = 10;
     config.fb_count = 2;
+    config.sharpness=-2;
   } else {
     config.frame_size = FRAMESIZE_SVGA;
     config.jpeg_quality = 12;
     config.fb_count = 1;
   }
+   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); 
   WiFiClient wifiClient;
   PubSubClient client(wifiClient);
 
-  ConnectToAP(wifi, WIFI_COUNT);    
-  connectToMQTT(&client, mqttServerIP, TOKEN, NULL, NULL);  
- // Init Camera
+  ConnectToAPInt(wifi, WIFI_COUNT);    
+  connectToMQTTInt(&client, mqttServerIP, TOKEN, NULL, NULL);  
+ 
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
     Serial.printf("Camera init failed with error 0x%x", err);
-     goDeepSleep(30);
+     goDeepSleepInt(30);
   }
-  pinMode(4, INPUT);
-  digitalWrite(4, LOW);
+  pinMode(4, OUTPUT);
+  digitalWrite(4, HIGH);
   rtc_gpio_hold_dis(GPIO_NUM_4);
-  delay(200);
+  delay(3000);
   // Take Picture with Camera
   fb = esp_camera_fb_get();  
   if(!fb) {
     Serial.println("Camera capture failed");
-     goDeepSleep(30);
+     goDeepSleepInt(30);
   }
-  Serial.println("Cam ok");
-  // initialize EEPROM with predefined size
-  
+  Serial.println("Cam ok");   
 
-  
-  delay(1000);
-  Serial.println("Cam ok 2");
+    
   timeClient.begin();
  int i=0;
  while(!timeClient.update()){
   i++;
   if(i>20)
-    break;
+   goDeepSleepInt(30);
   Serial.println("TIME NOT UPDATE");
   delay(100);
- }
- Serial.println( );
+ } 
+ /*Gaszenie diody*/
+ delay(500);
+// pinMode(4, OUTPUT);
+ digitalWrite(4, LOW);  
+ rtc_gpio_hold_en(GPIO_NUM_4);
  timeRead=String(timeClient.getEpochTime());
  timeClient.end();
  pic_name= timeRead+".jpg";
   FTP_upload();
   delay(1000);
   esp_camera_fb_return(fb); 
-  
-  pinMode(4, OUTPUT);
-  digitalWrite(4, LOW);  
-  rtc_gpio_hold_en(GPIO_NUM_4);
+    
   delay(2000);  
   sendToMqtt(&client,"/telemetry/technical/info", generateTechInfo(FW_VERSION, FW_INFO));  
   sendToMqtt(client);  
@@ -235,11 +309,7 @@ reg_c = READ_PERI_REG(SENS_SAR_MEAS_START2_REG);
   wifiClient.stop();
   WiFi.mode(WIFI_OFF);
   delay(1000);
-  WRITE_PERI_REG(SENS_SAR_START_FORCE_REG, reg_a);  // fix ADC registers
-  WRITE_PERI_REG(SENS_SAR_READ_CTRL2_REG, reg_b);
-  WRITE_PERI_REG(SENS_SAR_MEAS_START2_REG, reg_c);    
- goDeepSleep(3);
-  Serial.println("This will never be printed");
+goDeepSleepInt(deepSleepTime);
 }
 
 void loop() {

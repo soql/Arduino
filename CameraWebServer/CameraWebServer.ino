@@ -37,7 +37,7 @@ void setup() {
  // digitalWrite(4,HIGH);
   Serial.setDebugOutput(true);
   Serial.println();
-
+Serial.println("ELO");
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;

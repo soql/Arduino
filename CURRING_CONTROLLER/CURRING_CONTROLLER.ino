@@ -7,7 +7,7 @@
 
 #define TOKEN "ESP8266_CURRING"
 
-#define FW_VERSION 9
+#define FW_VERSION 17
 #define FW_INFO "Kontroler curringu"
 
 IPAddress mqttServerIP(192,168,1,168);
@@ -65,9 +65,11 @@ void setup() {
   pinMode(D7, OUTPUT);  
 
   pinMode(D2, INPUT);  
-
-changePhaseAuto=millis();
-   
+  
+  delay(200);
+  changePhase();
+  delay(200);
+  changePhase();  
 }
 
 
